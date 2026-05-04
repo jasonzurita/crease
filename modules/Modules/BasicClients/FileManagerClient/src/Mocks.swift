@@ -11,7 +11,8 @@ public extension FileManagerClient {
         createDirectory: @escaping @Sendable (_ url: URL, _ withIntermediateDirectories: Bool) throws -> Void = { _, _ in },
         getCreationDate: @escaping @Sendable (URL) throws -> Date = { _ in Date() },
         url: @escaping @Sendable (FileManager.SearchPathDirectory, FileManager.SearchPathDomainMask, URL?, Bool) throws -> URL = { _, _, _, _ in URL(fileURLWithPath: "") },
-        copyItem: @escaping @Sendable (_ from: URL, _ to: URL) throws -> Void = { _, _ in }
+        copyItem: @escaping @Sendable (_ from: URL, _ to: URL) throws -> Void = { _, _ in },
+        writeData: @escaping @Sendable (_ data: Data, _ url: URL) throws -> Void = { _, _ in }
     ) -> Self {
         .init(
             attributesOfItem: attributesOfItem,
@@ -23,7 +24,8 @@ public extension FileManagerClient {
             createDirectory: createDirectory,
             getCreationDate: getCreationDate,
             url: url,
-            copyItem: copyItem
+            copyItem: copyItem,
+            writeData: writeData
         )
     }
 

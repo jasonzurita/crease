@@ -38,6 +38,9 @@ public struct FileManagerClient: Sendable {
     /// Copies the item at the given source URL to the destination URL.
     public var copyItem: @Sendable (_ from: URL, _ to: URL) throws -> Void
 
+    /// Writes Data to the file at the given URL, creating it if it does not exist.
+    public var writeData: @Sendable (_ data: Data, _ url: URL) throws -> Void
+
     public init(
         attributesOfItem: @escaping @Sendable (_ path: String) throws -> [FileAttributeKey: Any],
         fileExistsAtPath: @escaping @Sendable (_ path: String) -> Bool,
@@ -53,7 +56,8 @@ public struct FileManagerClient: Sendable {
             _ appropriateFor: URL?,
             _ shouldCreate: Bool
         ) throws -> URL,
-        copyItem: @escaping @Sendable (_ from: URL, _ to: URL) throws -> Void
+        copyItem: @escaping @Sendable (_ from: URL, _ to: URL) throws -> Void,
+        writeData: @escaping @Sendable (_ data: Data, _ url: URL) throws -> Void
     ) {
         self.attributesOfItem = attributesOfItem
         self.fileExistsAtPath = fileExistsAtPath
@@ -65,6 +69,7 @@ public struct FileManagerClient: Sendable {
         self.getCreationDate = getCreationDate
         self.url = url
         self.copyItem = copyItem
+        self.writeData = writeData
     }
 
     public enum FileManagerClientError: Error {

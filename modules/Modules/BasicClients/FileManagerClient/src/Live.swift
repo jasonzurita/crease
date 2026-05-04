@@ -32,6 +32,9 @@ public extension FileManagerClient {
             url: { try FileManager.default.url(for: $0, in: $1, appropriateFor: $2, create: $3) },
             copyItem: { from, to in
                 try FileManager.default.copyItem(at: from, to: to)
+            },
+            writeData: { data, url in
+                try data.write(to: url, options: [])
             }
         )
     }
