@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(textutil -convert txt -stdout Crease_Product_Spec.docx)",
+      "Bash(cp ~/Code/set-hike-flag-football/modules/Modules/BasicClients/ApplicationClient/src/Interface.swift /Users/zurita/Code/crease/modules/Modules/BasicClients/ApplicationClient/src/Interface.swift)",
+      "Bash(cp ~/Code/set-hike-flag-football/modules/Modules/BasicClients/ApplicationClient/src/Live.swift /Users/zurita/Code/crease/modules/Modules/BasicClients/ApplicationClient/src/Live.swift)",
+      "Bash(cp ~/Code/set-hike-flag-football/modules/Modules/BasicClients/ApplicationClient/src/Mocks.swift /Users/zurita/Code/crease/modules/Modules/BasicClients/ApplicationClient/src/Mocks.swift)",
+      "Bash(cp ~/Code/set-hike-flag-football/modules/Modules/BasicClients/ApplicationClient/src/UIApplication+extension.swift /Users/zurita/Code/crease/modules/Modules/BasicClients/ApplicationClient/src/UIApplication+extension.swift)",
+      "Bash(cp ~/Code/set-hike-flag-football/modules/Modules/BasicClients/FileManagerClient/src/Interface.swift /Users/zurita/Code/crease/modules/Modules/BasicClients/FileManagerClient/src/Interface.swift)",
+      "Bash(cp ~/Code/set-hike-flag-football/modules/Modules/BasicClients/FileManagerClient/src/Live.swift /Users/zurita/Code/crease/modules/Modules/BasicClients/FileManagerClient/src/Live.swift)",
+      "Bash(cp ~/Code/set-hike-flag-football/modules/Modules/BasicClients/FileManagerClient/src/Mocks.swift /Users/zurita/Code/crease/modules/Modules/BasicClients/FileManagerClient/src/Mocks.swift)",
+      "Bash(cp ~/Code/set-hike-flag-football/modules/Modules/BasicClients/UserDefaultsClient/src/Interface.swift /Users/zurita/Code/crease/modules/Modules/BasicClients/UserDefaultsClient/src/Interface.swift)",
+      "Bash(cp ~/Code/set-hike-flag-football/modules/Modules/BasicClients/UserDefaultsClient/src/Live.swift /Users/zurita/Code/crease/modules/Modules/BasicClients/UserDefaultsClient/src/Live.swift)",
+      "Bash(cp ~/Code/set-hike-flag-football/modules/Modules/BasicClients/UserDefaultsClient/src/Mocks.swift /Users/zurita/Code/crease/modules/Modules/BasicClients/UserDefaultsClient/src/Mocks.swift)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git commit *)"
+    ]
+  }
+}
