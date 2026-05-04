@@ -9,8 +9,8 @@ Website: (add when published)
 
 ## Build & Workspace
 
-- Open `Crease.xcworkspace` (use this, not the `.xcodeproj` directly)
-- Primary scheme: **Crease**
+- Open `crease/crease.xcodeproj` (the `modules/` SPM package is linked directly as a local package reference — no separate workspace needed)
+- Primary scheme: **crease**
 - Swift Package dependencies live under `modules/`
 - Test plans live in `TestPlans/` — one `.xctestplan` per module
 
@@ -141,6 +141,7 @@ Each phase is a discrete unit of work. Complete one phase fully — including te
 General rules for every phase:
 - Write unit tests for all business logic before or alongside implementation
 - SwiftUI views are not unit tested — use `#Preview` blocks for visual validation
+- **Before committing:** verify the app builds and runs via the Xcode MCP (`BuildProject`, `RunAllTests`) — zero errors, zero warnings required
 - Each phase ends with a descriptive git commit
 - The app must build and run with zero errors and zero warnings at the end of every phase
 
