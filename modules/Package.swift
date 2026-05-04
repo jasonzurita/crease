@@ -15,7 +15,6 @@ let package = Package(
         .library(name: "CodablePersistenceClient", targets: ["CodablePersistenceClient"]),
     ],
     targets: [
-
         // MARK: - App
 
         .target(
@@ -24,12 +23,20 @@ let package = Package(
                 "CRModel",
                 "CRDesign",
                 "CRWorld",
+                "CodablePersistenceClient",
+                "FileManagerClient",
+                "UserDefaultsClient",
             ],
             path: "Modules/App/src"
         ),
         .testTarget(
             name: "CRAppTests",
-            dependencies: ["CRApp"],
+            dependencies: [
+                "CRApp",
+                "CRModel",
+                "FileManagerClient",
+                "UserDefaultsClient",
+            ],
             path: "Modules/App/Tests"
         ),
 
@@ -91,6 +98,7 @@ let package = Package(
         ),
 
         // MARK: - Features
+
         // Add feature targets here as they are built (one per phase).
     ]
 )
