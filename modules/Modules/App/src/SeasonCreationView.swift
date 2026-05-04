@@ -54,12 +54,7 @@ public struct SeasonCreationView: View {
             divider
             formRow(label: "Season", text: $viewModel.seasonName, placeholder: "e.g. Spring 2025")
         }
-        .background(Color.crSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
+        .crSurfaceCard()
     }
 
     private var formatSection: some View {
@@ -70,24 +65,11 @@ public struct SeasonCreationView: View {
                 .padding(.horizontal, 4)
 
             VStack(spacing: 0) {
-                stepperRow(
-                    label: "Quarters",
-                    value: $viewModel.gameFormatDefaults.quarters,
-                    range: 1 ... 8
-                )
+                stepperRow(label: "Quarters", value: $viewModel.gameFormatDefaults.quarters, range: 1 ... 8, unit: nil)
                 divider
-                stepperRow(
-                    label: "Quarter Length",
-                    value: $viewModel.gameFormatDefaults.quarterLengthMinutes,
-                    range: 5 ... 20,
-                    unit: "min"
-                )
+                stepperRow(label: "Quarter Length", value: $viewModel.gameFormatDefaults.quarterLengthMinutes, range: 5 ... 20, unit: "min")
                 divider
-                stepperRow(
-                    label: "Players Per Side",
-                    value: $viewModel.gameFormatDefaults.playersPerSide,
-                    range: 5 ... 11
-                )
+                stepperRow(label: "Players Per Side", value: $viewModel.gameFormatDefaults.playersPerSide, range: 5 ... 11, unit: nil)
                 divider
                 HStack {
                     Text("Mid-Quarter Subs")
@@ -99,12 +81,7 @@ public struct SeasonCreationView: View {
                 }
                 .padding()
             }
-            .background(Color.crSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
-            )
+            .crSurfaceCard()
         }
     }
 
@@ -149,17 +126,12 @@ public struct SeasonCreationView: View {
         .padding()
     }
 
-    private func stepperRow(
-        label: String,
-        value: Binding<Int>,
-        range: ClosedRange<Int>,
-        unit: String = ""
-    ) -> some View {
+    private func stepperRow(label: String, value: Binding<Int>, range: ClosedRange<Int>, unit: String?) -> some View {
         HStack {
             Text(label)
                 .foregroundStyle(Color.crTextPrimary)
             Spacer()
-            Text(unit.isEmpty ? "\(value.wrappedValue)" : "\(value.wrappedValue) \(unit)")
+            Text(unit.map { "\(value.wrappedValue) \($0)" } ?? "\(value.wrappedValue)")
                 .font(.body.monospacedDigit())
                 .foregroundStyle(Color.crTextPrimary)
                 .frame(minWidth: 52, alignment: .trailing)

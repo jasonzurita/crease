@@ -10,8 +10,7 @@ public final class SeasonCreationViewModel {
     public var gameFormatDefaults: GameFormatDefaults = .default
 
     public var isValid: Bool {
-        !teamName.trimmingCharacters(in: .whitespaces).isEmpty
-            && !seasonName.trimmingCharacters(in: .whitespaces).isEmpty
+        !trimmedTeamName.isEmpty && !trimmedSeasonName.isEmpty
     }
 
     public init() {}
@@ -19,11 +18,19 @@ public final class SeasonCreationViewModel {
     public func create(in store: SeasonStore) throws {
         let season = Season(
             id: UUID(),
-            teamName: teamName.trimmingCharacters(in: .whitespaces),
-            seasonName: seasonName.trimmingCharacters(in: .whitespaces),
+            teamName: trimmedTeamName,
+            seasonName: trimmedSeasonName,
             gameFormatDefaults: gameFormatDefaults,
             createdAt: Date()
         )
         try store.create(season)
+    }
+
+    private var trimmedTeamName: String {
+        teamName.trimmingCharacters(in: .whitespaces)
+    }
+
+    private var trimmedSeasonName: String {
+        seasonName.trimmingCharacters(in: .whitespaces)
     }
 }

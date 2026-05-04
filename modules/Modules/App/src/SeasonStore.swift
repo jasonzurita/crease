@@ -13,31 +13,30 @@ public final class SeasonStore {
     private let persistenceClient: CodablePersistenceClient<Season>
     private let userDefaultsClient: UserDefaultsClient
 
+    private static let activeSeasonKey = "cr_active_season_id"
+
     public init(fileManagerClient: FileManagerClient, userDefaultsClient: UserDefaultsClient) {
         self.userDefaultsClient = userDefaultsClient
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = .prettyPrinted
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
 
         let client: CodablePersistenceClient<Season>
         do {
             let documentsURL = try fileManagerClient.url(.documentDirectory, .userDomainMask, nil, false)
             let seasonsURL = documentsURL.appending(component: "Seasons")
-            if !fileManagerClient.fileExistsAtPath(seasonsURL.path) {
-                try fileManagerClient.createDirectory(seasonsURL, true)
-            }
+            try fileManagerClient.createDirectory(seasonsURL, true)
             client = CodablePersistenceClient<Season>(
                 save: { season, id in
                     let seasonDir = seasonsURL.appending(component: id)
-                    if !fileManagerClient.fileExistsAtPath(seasonDir.path) {
-                        try fileManagerClient.createDirectory(seasonDir, true)
-                    }
-                    let encoder = JSONEncoder()
-                    encoder.dateEncodingStrategy = .iso8601
-                    encoder.outputFormatting = .prettyPrinted
+                    try fileManagerClient.createDirectory(seasonDir, true)
                     let data = try encoder.encode(season)
                     try fileManagerClient.writeData(data, seasonDir.appending(component: "season.json"))
                 },
                 getAll: {
-                    let decoder = JSONDecoder()
-                    decoder.dateDecodingStrategy = .iso8601
                     let subdirs = try fileManagerClient.contentsOfDirectoryUrls(
                         seasonsURL, nil, [.skipsHiddenFiles]
                     )
@@ -65,7 +64,7 @@ public final class SeasonStore {
             logger.error("Failed to load seasons: \(error)")
         }
 
-        let activeID = userDefaultsClient.stringForKey("cr_active_season_id")
+        let activeID = userDefaultsClient.stringForKey(Self.activeSeasonKey)
         activeSeason = seasons.first { $0.id.uuidString == activeID } ?? seasons.first
     }
 
@@ -77,6 +76,6 @@ public final class SeasonStore {
 
     public func setActive(_ season: Season) {
         activeSeason = season
-        userDefaultsClient.storeString(season.id.uuidString, "cr_active_season_id")
+        userDefaultsClient.storeString(season.id.uuidString, Self.activeSeasonKey)
     }
 }
