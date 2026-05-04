@@ -1,17 +1,14 @@
-//
-//  creaseApp.swift
-//  crease
-//
-//  Created by Jason Zurita on 5/4/26.
-//
-
+import CRApp
+import CRWorld
 import SwiftUI
 
 @main
-struct creaseApp: App {
+struct CreaseApp: App {
+    private let viewModel = AppRootViewModel(world: Current)
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppRootView(viewModel: viewModel)
         }
     }
 }
