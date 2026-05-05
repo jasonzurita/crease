@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "CRModel", targets: ["CRModel"]),
         .library(name: "CRDesign", targets: ["CRDesign"]),
         .library(name: "CRWorld", targets: ["CRWorld"]),
+        .library(name: "RotationSolver", targets: ["RotationSolver"]),
         .library(name: "ApplicationClient", targets: ["ApplicationClient"]),
         .library(name: "FileManagerClient", targets: ["FileManagerClient"]),
         .library(name: "UserDefaultsClient", targets: ["UserDefaultsClient"]),
@@ -23,6 +24,7 @@ let package = Package(
                 "CRModel",
                 "CRDesign",
                 "CRWorld",
+                "RotationSolver",
                 "CodablePersistenceClient",
                 "FileManagerClient",
                 "UserDefaultsClient",
@@ -70,6 +72,19 @@ let package = Package(
                 "UserDefaultsClient",
             ],
             path: "Modules/World/src"
+        ),
+
+        // MARK: - RotationSolver
+
+        .target(
+            name: "RotationSolver",
+            dependencies: ["CRModel"],
+            path: "Modules/RotationSolver/src"
+        ),
+        .testTarget(
+            name: "RotationSolverTests",
+            dependencies: ["RotationSolver", "CRModel"],
+            path: "Modules/RotationSolver/Tests"
         ),
 
         // MARK: - BasicClients

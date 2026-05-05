@@ -2,6 +2,7 @@ import CodablePersistenceClient
 import CRModel
 import FileManagerClient
 import Foundation
+import RotationSolver
 import UserDefaultsClient
 
 @Observable
@@ -132,6 +133,13 @@ public final class SeasonStore {
         games.removeAll { $0.id == game.id }
         guard let season = activeSeason, let url = gameURL(for: season, game: game) else { return }
         try fileManagerClient.removeItem(url)
+    }
+
+    public func generatePlan(for game: Game) throws {
+        var updated = game
+        updated.rotationPlan = RotationSolver.solve(game: game, players: players)
+        updated.status = .ready
+        try updateGame(updated)
     }
 
     // MARK: - Private

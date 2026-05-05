@@ -1,0 +1,223 @@
+import CRModel
+import Foundation
+
+public struct RotationSolver: Sendable {
+    private init() {}
+
+    public static func solve(game: Game, players: [Player]) -> RotationPlan {
+        guard game.format.quarters > 0, game.format.playersPerSide > 0 else {
+            return RotationPlan(slots: [], violations: [])
+        }
+
+        let schedule = makeSchedule(format: game.format, rotationStyle: game.rotationStyle)
+        let duration = rotationDuration(format: game.format, rotationStyle: game.rotationStyle)
+        let slotCounts = makeSlotCounts(playersPerSide: game.format.playersPerSide)
+        let boostedIDs = Set(game.boostedPlayerIDs)
+
+        let presentPlayers = players.filter { player in
+            game.attendance.first { $0.id == player.id }?.isPresent == true
+        }
+
+        let availableSlotCounts = computeAvailableSlotCounts(
+            schedule: schedule,
+            attendance: game.attendance,
+            playerIDs: presentPlayers.map { $0.id }
+        )
+
+        var effectiveSlotsPlayed: [UUID: Int] = [:]
+        var rotationSlots: [RotationSlot] = []
+        var violations: [Violation] = []
+
+        for (quarter, subIndex) in schedule {
+            let isKeySlot = game.competitivenessMode == .competitive && subIndex == 0
+
+            let availableNow = presentPlayers.filter {
+                isAvailable(playerID: $0.id, quarter: quarter, attendance: game.attendance)
+            }
+
+            var assignedIDs: Set<UUID> = []
+            var assignments: [PositionAssignment] = []
+
+            for position in [Position.goalie, .attack, .midfield, .defense] {
+                let count = slotCounts[position] ?? 0
+                guard count > 0 else { continue }
+
+                let eligible = availableNow.filter {
+                    !assignedIDs.contains($0.id) && $0.positions.contains(position)
+                }
+
+                let sorted = prioritized(
+                    eligible,
+                    effectiveSlotsPlayed: effectiveSlotsPlayed,
+                    availableSlotCounts: availableSlotCounts,
+                    isKeySlot: isKeySlot,
+                    mode: game.competitivenessMode,
+                    boostedIDs: boostedIDs
+                )
+
+                let toAssign = min(count, sorted.count)
+                for i in 0..<toAssign {
+                    let player = sorted[i]
+                    assignedIDs.insert(player.id)
+                    assignments.append(PositionAssignment(position: position, playerID: player.id))
+                }
+
+                for _ in toAssign..<count {
+                    violations.append(.noEligiblePlayer(position: position, quarter: quarter, subIndex: subIndex))
+                }
+            }
+
+            let bench = availableNow
+                .filter { !assignedIDs.contains($0.id) }
+                .map { $0.id }
+
+            rotationSlots.append(RotationSlot(
+                quarter: quarter,
+                subIndex: subIndex,
+                assignments: assignments,
+                bench: bench
+            ))
+
+            for pa in assignments {
+                let counts = pa.position != .goalie || game.fairnessTargets.goalieTimeCountsAsFieldTime
+                if counts {
+                    effectiveSlotsPlayed[pa.playerID, default: 0] += 1
+                }
+            }
+        }
+
+        for player in presentPlayers {
+            let played = effectiveSlotsPlayed[player.id] ?? 0
+            let projectedMinutes = played * duration
+            let minimumMinutes = game.fairnessTargets.minutes(for: player.tier)
+            if projectedMinutes < minimumMinutes {
+                violations.append(.minutesBelowMinimum(
+                    playerID: player.id,
+                    projectedMinutes: projectedMinutes,
+                    minimumMinutes: minimumMinutes
+                ))
+            }
+        }
+
+        return RotationPlan(slots: rotationSlots, violations: violations)
+    }
+
+    // MARK: - Private helpers
+
+    private static func makeSchedule(
+        format: GameFormatDefaults,
+        rotationStyle: RotationStyle
+    ) -> [(quarter: Int, subIndex: Int)] {
+        switch rotationStyle {
+        case .byQuarter:
+            return (1...format.quarters).map { ($0, 0) }
+        case .byTimeInterval(let interval):
+            let subsPerQuarter = max(1, format.quarterLengthMinutes / interval)
+            return (1...format.quarters).flatMap { q in
+                (0..<subsPerQuarter).map { s in (q, s) }
+            }
+        }
+    }
+
+    private static func rotationDuration(format: GameFormatDefaults, rotationStyle: RotationStyle) -> Int {
+        switch rotationStyle {
+        case .byQuarter: return format.quarterLengthMinutes
+        case .byTimeInterval(let interval): return interval
+        }
+    }
+
+    private static func makeSlotCounts(playersPerSide: Int) -> [Position: Int] {
+        let fieldPlayers = max(0, playersPerSide - 1)
+        let base = fieldPlayers / 3
+        let remainder = fieldPlayers % 3
+        return [
+            .goalie: 1,
+            .attack: base + (remainder > 0 ? 1 : 0),
+            .midfield: base + (remainder > 1 ? 1 : 0),
+            .defense: base,
+        ]
+    }
+
+    private static func computeAvailableSlotCounts(
+        schedule: [(quarter: Int, subIndex: Int)],
+        attendance: [PlayerAttendance],
+        playerIDs: [UUID]
+    ) -> [UUID: Int] {
+        var counts: [UUID: Int] = [:]
+        for id in playerIDs {
+            counts[id] = schedule.filter {
+                isAvailable(playerID: id, quarter: $0.quarter, attendance: attendance)
+            }.count
+        }
+        return counts
+    }
+
+    private static func isAvailable(playerID: UUID, quarter: Int, attendance: [PlayerAttendance]) -> Bool {
+        guard let att = attendance.first(where: { $0.id == playerID }) else { return false }
+        guard att.isPresent else { return false }
+        if let lateQ = att.lateArrivalQuarter, quarter < lateQ { return false }
+        if let earlyQ = att.earlyDepartureQuarter, quarter > earlyQ { return false }
+        return true
+    }
+
+    private static func prioritized(
+        _ players: [Player],
+        effectiveSlotsPlayed: [UUID: Int],
+        availableSlotCounts: [UUID: Int],
+        isKeySlot: Bool,
+        mode: CompetitivenessMode,
+        boostedIDs: Set<UUID>
+    ) -> [Player] {
+        players.sorted { a, b in
+            let aBoosted = boostedIDs.contains(a.id)
+            let bBoosted = boostedIDs.contains(b.id)
+            if aBoosted != bBoosted { return aBoosted }
+
+            if isKeySlot && mode == .competitive {
+                let at = tierStrength(a.tier)
+                let bt = tierStrength(b.tier)
+                if at != bt { return at > bt }
+            }
+
+            let ar = playRatio(
+                for: a.id,
+                effectiveSlotsPlayed: effectiveSlotsPlayed,
+                availableSlotCounts: availableSlotCounts
+            )
+            let br = playRatio(
+                for: b.id,
+                effectiveSlotsPlayed: effectiveSlotsPlayed,
+                availableSlotCounts: availableSlotCounts
+            )
+
+            if abs(ar - br) < 0.001 && (mode == .balanced || mode == .competitive) {
+                let at = tierStrength(a.tier)
+                let bt = tierStrength(b.tier)
+                if at != bt { return at > bt }
+            }
+
+            return ar < br
+        }
+    }
+
+    private static func playRatio(
+        for playerID: UUID,
+        effectiveSlotsPlayed: [UUID: Int],
+        availableSlotCounts: [UUID: Int]
+    ) -> Double {
+        let played = Double(effectiveSlotsPlayed[playerID] ?? 0)
+        let available = Double(availableSlotCounts[playerID] ?? 1)
+        guard available > 0 else { return 1.0 }
+        return played / available
+    }
+
+    private static func tierStrength(_ tier: Tier) -> Int {
+        switch tier {
+        case .elite: 5
+        case .strong: 4
+        case .developing: 3
+        case .learning: 2
+        case .beginner: 1
+        }
+    }
+}

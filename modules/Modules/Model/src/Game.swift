@@ -12,6 +12,7 @@ public struct Game: Codable, Equatable, Identifiable, Sendable {
     public var fairnessTargets: FairnessTargets
     public var competitivenessMode: CompetitivenessMode
     public var boostedPlayerIDs: [UUID]
+    public var rotationPlan: RotationPlan?
     public let createdAt: Date
 
     public init(
@@ -26,6 +27,7 @@ public struct Game: Codable, Equatable, Identifiable, Sendable {
         fairnessTargets: FairnessTargets,
         competitivenessMode: CompetitivenessMode,
         boostedPlayerIDs: [UUID],
+        rotationPlan: RotationPlan? = nil,
         createdAt: Date
     ) {
         self.id = id
@@ -39,6 +41,7 @@ public struct Game: Codable, Equatable, Identifiable, Sendable {
         self.fairnessTargets = fairnessTargets
         self.competitivenessMode = competitivenessMode
         self.boostedPlayerIDs = boostedPlayerIDs
+        self.rotationPlan = rotationPlan
         self.createdAt = createdAt
     }
 }
