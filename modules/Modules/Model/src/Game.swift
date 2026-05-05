@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Game: Codable, Equatable, Identifiable, Sendable {
+public struct Game: Codable, Equatable, Hashable, Identifiable, Sendable {
     public let id: UUID
     public var opponent: String
     public var date: Date
@@ -43,5 +43,9 @@ public struct Game: Codable, Equatable, Identifiable, Sendable {
         self.boostedPlayerIDs = boostedPlayerIDs
         self.rotationPlan = rotationPlan
         self.createdAt = createdAt
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
