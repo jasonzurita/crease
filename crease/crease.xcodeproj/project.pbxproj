@@ -100,9 +100,6 @@
 			);
 			mainGroup = EA53B9E22FA8F68400EA763D;
 			minimizedProjectReferenceProxies = 1;
-			packageReferences = (
-				EA53BA052FA931CB00EA763D /* XCLocalSwiftPackageReference "../modules" */,
-			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EA53B9EC2FA8F68500EA763D /* Products */;
 			projectDirPath = "";
@@ -341,13 +338,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCLocalSwiftPackageReference section */
-		EA53BA052FA931CB00EA763D /* XCLocalSwiftPackageReference "../modules" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../modules;
-		};
-/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		EA53BA062FA931CB00EA763D /* CRApp */ = {

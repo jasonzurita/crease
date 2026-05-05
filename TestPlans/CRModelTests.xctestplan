@@ -1,0 +1,29 @@
+{
+  "configurations" : [
+    {
+      "id" : "A1B2C3D4-E5F6-7890-ABCD-EF0000000003",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : false,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:crease.xcodeproj",
+      "identifier" : "EA53B9EA2FA8F68500EA763D",
+      "name" : "crease"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:..\/modules",
+        "identifier" : "CRModelTests",
+        "name" : "CRModelTests"
+      }
+    }
+  ],
+  "version" : 1
+}

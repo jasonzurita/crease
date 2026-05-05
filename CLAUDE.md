@@ -9,19 +9,20 @@ Website: (add when published)
 
 ## Build & Workspace
 
-- Open `crease/crease.xcodeproj` (the `modules/` SPM package is linked directly as a local package reference — no separate workspace needed)
+- Open `Crease.xcworkspace` (at the project root) — this is the correct entry point
+- The workspace includes both `modules/` (the SPM package) and `crease/crease.xcodeproj`
 - Primary scheme: **crease**
 - Swift Package dependencies live under `modules/`
-- Test plans live in `TestPlans/` — one `.xctestplan` per module
+- Test plans live in `TestPlans/` — one `.xctestplan` per module (plus `crease.xctestplan` which runs all)
 
 ## Running Tests
 
 ```
 xcodebuild test \
   -workspace Crease.xcworkspace \
-  -scheme Crease \
-  -testPlan <PlanName> \
-  -destination 'platform=iOS Simulator,name=iPhone 16'
+  -scheme crease \
+  -testPlan crease \
+  -destination 'platform=iOS Simulator,id=1392154F-5060-4F2B-A354-94B386551032'
 ```
 
 ## Module Architecture
