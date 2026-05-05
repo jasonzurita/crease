@@ -16,7 +16,7 @@ public extension ApplicationClient {
                 UIApplication.shared.isIdleTimerDisabled = isDisabled
             },
             interfaceOrientation: {
-                (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.interfaceOrientation
+                (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.effectiveGeometry.interfaceOrientation
             },
             applicationStatePublisher: {
                 Publishers.MergeMany([
