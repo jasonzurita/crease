@@ -21,6 +21,7 @@ public struct MainTabView: View {
             }
         }
         .tint(Color.crAccent)
+        .environment(store)
     }
 }
 

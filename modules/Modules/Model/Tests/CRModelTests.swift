@@ -42,6 +42,87 @@ struct SeasonTests {
     }
 }
 
+@Suite("Player")
+struct PlayerTests {
+    private let fixedID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+
+    @Test func codableRoundTrip() throws {
+        let original = Player(
+            id: fixedID,
+            name: "Alex Johnson",
+            jerseyNumber: 12,
+            positions: [.midfield, .attack],
+            tier: .strong
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(Player.self, from: data)
+        #expect(decoded == original)
+    }
+
+    @Test func encodesExpectedKeys() throws {
+        let player = Player(
+            id: fixedID,
+            name: "Alex Johnson",
+            jerseyNumber: 12,
+            positions: [.midfield],
+            tier: .elite
+        )
+        let data = try JSONEncoder().encode(player)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        #expect(json?["id"] != nil)
+        #expect(json?["name"] as? String == "Alex Johnson")
+        #expect(json?["jerseyNumber"] as? Int == 12)
+        #expect(json?["positions"] != nil)
+        #expect(json?["tier"] as? String == "Elite")
+    }
+
+    @Test func goalieWithFieldPositions() throws {
+        let player = Player(
+            id: fixedID,
+            name: "Sam Lee",
+            jerseyNumber: 1,
+            positions: [.goalie, .defense],
+            tier: .developing
+        )
+        let data = try JSONEncoder().encode(player)
+        let decoded = try JSONDecoder().decode(Player.self, from: data)
+        #expect(decoded.positions.contains(.goalie))
+        #expect(decoded.positions.contains(.defense))
+        #expect(decoded.positions.count == 2)
+    }
+}
+
+@Suite("Tier")
+struct TierTests {
+    @Test func allCasesOrdered() {
+        let cases = Tier.allCases
+        #expect(cases[0] == .elite)
+        #expect(cases[1] == .strong)
+        #expect(cases[2] == .developing)
+        #expect(cases[3] == .learning)
+        #expect(cases[4] == .beginner)
+    }
+
+    @Test func codableRoundTrip() throws {
+        for tier in Tier.allCases {
+            let data = try JSONEncoder().encode(tier)
+            let decoded = try JSONDecoder().decode(Tier.self, from: data)
+            #expect(decoded == tier)
+        }
+    }
+}
+
+@Suite("Position")
+struct PositionTests {
+    @Test func codableRoundTrip() throws {
+        for position in Position.allCases {
+            let data = try JSONEncoder().encode(position)
+            let decoded = try JSONDecoder().decode(Position.self, from: data)
+            #expect(decoded == position)
+        }
+    }
+}
+
 @Suite("GameFormatDefaults")
 struct GameFormatDefaultsTests {
     @Test func defaultValues() {
