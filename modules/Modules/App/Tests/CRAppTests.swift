@@ -274,3 +274,136 @@ struct SeasonStoreRosterTests {
         #expect(store.players.isEmpty)
     }
 }
+
+@Suite("SeasonStore — Games")
+@MainActor
+struct SeasonStoreGameTests {
+    private let fixedSeasonID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    private let fixedGameID = UUID(uuidString: "00000000-0000-0000-0000-000000000010")!
+    private let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
+
+    private func storeWithActiveSeason() throws -> SeasonStore {
+        let store = SeasonStore(fileManagerClient: .mock(), userDefaultsClient: .noop)
+        let season = Season(
+            id: fixedSeasonID,
+            teamName: "Eagles",
+            seasonName: "Spring 2025",
+            gameFormatDefaults: .default,
+            createdAt: fixedDate
+        )
+        try store.create(season)
+        return store
+    }
+
+    private func makeGame(id: UUID? = nil) -> Game {
+        Game(
+            id: id ?? UUID(),
+            opponent: "Hawks",
+            date: fixedDate,
+            isHome: true,
+            status: .planned,
+            attendance: [],
+            format: .default,
+            rotationStyle: .byQuarter,
+            fairnessTargets: .default,
+            competitivenessMode: .balanced,
+            boostedPlayerIDs: [],
+            createdAt: fixedDate
+        )
+    }
+
+    @Test func startsWithEmptyGamesWhenNoActiveSeason() {
+        let store = SeasonStore(fileManagerClient: .mock(), userDefaultsClient: .noop)
+        #expect(store.games.isEmpty)
+    }
+
+    @Test func createGameAddsToList() throws {
+        let store = try storeWithActiveSeason()
+        let game = makeGame(id: fixedGameID)
+        try store.createGame(game)
+        #expect(store.games.count == 1)
+        #expect(store.games.first?.id == fixedGameID)
+    }
+
+    @Test func deleteGameRemovesFromList() throws {
+        let store = try storeWithActiveSeason()
+        let game = makeGame(id: fixedGameID)
+        try store.createGame(game)
+        try store.deleteGame(game)
+        #expect(store.games.isEmpty)
+    }
+
+    @Test func updateGameModifiesInPlace() throws {
+        let store = try storeWithActiveSeason()
+        let original = makeGame(id: fixedGameID)
+        try store.createGame(original)
+
+        var updated = original
+        updated.opponent = "Lions"
+        updated.isHome = false
+        try store.updateGame(updated)
+
+        #expect(store.games.count == 1)
+        #expect(store.games.first?.opponent == "Lions")
+        #expect(store.games.first?.isHome == false)
+    }
+
+    @Test func loadsGamesFromDiskOnInit() throws {
+        let game = makeGame(id: fixedGameID)
+        let gameEncoder = JSONEncoder()
+        gameEncoder.dateEncodingStrategy = .iso8601
+        let gameData = try gameEncoder.encode(game)
+
+        let seasonEncoder = JSONEncoder()
+        seasonEncoder.dateEncodingStrategy = .iso8601
+        let season = Season(
+            id: fixedSeasonID,
+            teamName: "Eagles",
+            seasonName: "Spring 2025",
+            gameFormatDefaults: .default,
+            createdAt: fixedDate
+        )
+        let seasonData = try seasonEncoder.encode(season)
+
+        let seasonDir = URL(fileURLWithPath: "/fake/Seasons/\(fixedSeasonID.uuidString)")
+        let gamesDir = URL(fileURLWithPath: "/fake/Games")
+        let gameFileURL = gamesDir.appending(component: "game_\(fixedGameID.uuidString).json")
+
+        let store = SeasonStore(
+            fileManagerClient: .mock(
+                contentsOfDirectoryUrls: { url, _, _ in
+                    if url.path.hasSuffix("Seasons") { return [seasonDir] }
+                    if url.path.hasSuffix("Games") { return [gameFileURL] }
+                    return []
+                },
+                contents: { path in
+                    if path.hasSuffix("season.json") { return seasonData }
+                    if path.hasSuffix("game_\(fixedGameID.uuidString).json") { return gameData }
+                    return nil
+                }
+            ),
+            userDefaultsClient: .memoryStorage
+        )
+
+        #expect(store.games.count == 1)
+        #expect(store.games.first?.opponent == "Hawks")
+    }
+
+    @Test func gamesClearWhenSwitchingSeasons() throws {
+        let store = try storeWithActiveSeason()
+        let game = makeGame(id: fixedGameID)
+        try store.createGame(game)
+        #expect(store.games.count == 1)
+
+        let secondSeasonID = try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000009"))
+        let secondSeason = Season(
+            id: secondSeasonID,
+            teamName: "Hawks",
+            seasonName: "Fall 2025",
+            gameFormatDefaults: .default,
+            createdAt: fixedDate
+        )
+        try store.create(secondSeason)
+        #expect(store.games.isEmpty)
+    }
+}

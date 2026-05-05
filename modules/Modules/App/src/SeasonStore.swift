@@ -10,6 +10,7 @@ public final class SeasonStore {
     public private(set) var seasons: [Season] = []
     public private(set) var activeSeason: Season?
     public private(set) var players: [Player] = []
+    public private(set) var games: [Game] = []
 
     private let persistenceClient: CodablePersistenceClient<Season>
     private let fileManagerClient: FileManagerClient
@@ -79,6 +80,7 @@ public final class SeasonStore {
         activeSeason = seasons.first { $0.id.uuidString == activeID } ?? seasons.first
 
         loadRoster()
+        loadGames()
     }
 
     public func create(_ season: Season) throws {
@@ -91,6 +93,7 @@ public final class SeasonStore {
         activeSeason = season
         userDefaultsClient.storeString(season.id.uuidString, Self.activeSeasonKey)
         loadRoster()
+        loadGames()
     }
 
     // MARK: - Roster
@@ -109,6 +112,26 @@ public final class SeasonStore {
     public func deletePlayer(_ player: Player) throws {
         players.removeAll { $0.id == player.id }
         try saveRoster()
+    }
+
+    // MARK: - Games
+
+    public func createGame(_ game: Game) throws {
+        games.append(game)
+        games.sort { $0.date > $1.date }
+        try saveGame(game)
+    }
+
+    public func updateGame(_ game: Game) throws {
+        guard let index = games.firstIndex(where: { $0.id == game.id }) else { return }
+        games[index] = game
+        try saveGame(game)
+    }
+
+    public func deleteGame(_ game: Game) throws {
+        games.removeAll { $0.id == game.id }
+        guard let season = activeSeason, let url = gameURL(for: season, game: game) else { return }
+        try fileManagerClient.removeItem(url)
     }
 
     // MARK: - Private
@@ -137,6 +160,46 @@ public final class SeasonStore {
     private func saveRoster() throws {
         guard let season = activeSeason, let url = rosterURL(for: season) else { return }
         let data = try encoder.encode(players)
+        try fileManagerClient.writeData(data, url)
+    }
+
+    private func gamesDirectoryURL(for season: Season) -> URL? {
+        seasonsURL?
+            .appending(component: season.id.uuidString)
+            .appending(component: "Games")
+    }
+
+    private func gameURL(for season: Season, game: Game) -> URL? {
+        gamesDirectoryURL(for: season)?
+            .appending(component: "game_\(game.id.uuidString).json")
+    }
+
+    private func loadGames() {
+        guard let season = activeSeason,
+              let gamesDir = gamesDirectoryURL(for: season) else {
+            games = []
+            return
+        }
+        do {
+            try fileManagerClient.createDirectory(gamesDir, true)
+            let files = try fileManagerClient.contentsOfDirectoryUrls(gamesDir, nil, [.skipsHiddenFiles])
+            games = try files.compactMap { url in
+                guard let data = fileManagerClient.contents(url.path) else { return nil }
+                return try decoder.decode(Game.self, from: data)
+            }
+            games.sort { $0.date > $1.date }
+        } catch {
+            logger.error("Failed to load games: \(error)")
+            games = []
+        }
+    }
+
+    private func saveGame(_ game: Game) throws {
+        guard let season = activeSeason,
+              let gamesDir = gamesDirectoryURL(for: season),
+              let url = gameURL(for: season, game: game) else { return }
+        try fileManagerClient.createDirectory(gamesDir, true)
+        let data = try encoder.encode(game)
         try fileManagerClient.writeData(data, url)
     }
 }
