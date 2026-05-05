@@ -407,3 +407,321 @@ struct SeasonStoreGameTests {
         #expect(store.games.isEmpty)
     }
 }
+
+// MARK: - RotationOutputViewModel Tests
+
+@Suite("RotationOutputViewModel")
+@MainActor
+struct RotationOutputViewModelTests {
+    private let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
+    private let seasonID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    private let gameID = UUID(uuidString: "00000000-0000-0000-0000-000000000010")!
+
+    private func makeStore() throws -> SeasonStore {
+        let store = SeasonStore(fileManagerClient: .mock(), userDefaultsClient: .noop)
+        let season = Season(
+            id: seasonID,
+            teamName: "Eagles",
+            seasonName: "Spring 2025",
+            gameFormatDefaults: .default,
+            createdAt: fixedDate
+        )
+        try store.create(season)
+        return store
+    }
+
+    private func makePlayers() -> [Player] {
+        (0..<6).map { i in
+            Player(
+                id: UUID(),
+                name: "Player \(i)",
+                jerseyNumber: i,
+                positions: [.attack, .midfield, .defense, .goalie],
+                tier: .developing
+            )
+        }
+    }
+
+    private func makePlan(players: [Player]) -> RotationPlan {
+        RotationPlan(
+            slots: [
+                RotationSlot(
+                    quarter: 1,
+                    subIndex: 0,
+                    assignments: [
+                        PositionAssignment(position: .goalie, playerID: players[0].id, isLocked: false),
+                        PositionAssignment(position: .attack, playerID: players[1].id, isLocked: false),
+                        PositionAssignment(position: .midfield, playerID: players[2].id, isLocked: false),
+                        PositionAssignment(position: .defense, playerID: players[3].id, isLocked: false),
+                    ],
+                    bench: [players[4].id, players[5].id]
+                )
+            ],
+            violations: []
+        )
+    }
+
+    private func makeGame(players: [Player], plan: RotationPlan) -> Game {
+        Game(
+            id: gameID,
+            opponent: "Hawks",
+            date: fixedDate,
+            isHome: true,
+            status: .ready,
+            attendance: players.map {
+                PlayerAttendance(id: $0.id, isPresent: true, lateArrivalQuarter: nil, earlyDepartureQuarter: nil)
+            },
+            format: GameFormatDefaults(
+                quarters: 1,
+                quarterLengthMinutes: 10,
+                playersPerSide: 5,
+                midQuarterSubsEnabled: false
+            ),
+            rotationStyle: .byQuarter,
+            fairnessTargets: FairnessTargets(
+                eliteMinutes: 10,
+                strongMinutes: 8,
+                developingMinutes: 6,
+                learningMinutes: 4,
+                beginnerMinutes: 2,
+                goalieTimeCountsAsFieldTime: true
+            ),
+            competitivenessMode: .fair,
+            boostedPlayerIDs: [],
+            rotationPlan: plan,
+            createdAt: fixedDate
+        )
+    }
+
+    private func makeVM(
+        store: SeasonStore,
+        game: Game,
+        players: [Player]
+    ) throws -> RotationOutputViewModel {
+        try store.createGame(game)
+        return RotationOutputViewModel(game: game, players: players, store: store)
+    }
+
+    // MARK: - Playing time
+
+    @Test func projectedMinutesCountsAssignedSlots() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players)
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        // Player 0 is in goalie slot (counts because goalieTimeCountsAsFieldTime = true)
+        #expect(vm.projectedMinutes(for: players[0].id) == 10)
+        // Player 1 is in attack slot
+        #expect(vm.projectedMinutes(for: players[1].id) == 10)
+        // Player 4 is on bench
+        #expect(vm.projectedMinutes(for: players[4].id) == 0)
+    }
+
+    @Test func projectedMinutesExcludesGoalieWhenToggleOff() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players)
+        var game = makeGame(players: players, plan: plan)
+        game.fairnessTargets.goalieTimeCountsAsFieldTime = false
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        // Player 0 is goalie-only; with toggle off, their time = 0
+        #expect(vm.projectedMinutes(for: players[0].id) == 0)
+        // Field player still counts
+        #expect(vm.projectedMinutes(for: players[1].id) == 10)
+    }
+
+    @Test func minutesStatusMetWhenAtOrAboveMinimum() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players)
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        // Developing minimum = 6 min, player gets 10 min → .met
+        #expect(vm.minutesStatus(for: players[1].id) == .met)
+    }
+
+    @Test func minutesStatusViolationWhenBelowMinimum() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players)
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        // Player 4 is benched (0 min), developing minimum = 6 → .violation
+        #expect(vm.minutesStatus(for: players[4].id) == .violation)
+    }
+
+    // MARK: - Tap-to-swap
+
+    @Test func tapCellSelectsIt() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players)
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        vm.tapCell(slotIndex: 0, position: .goalie)
+        #expect(vm.selectedCell == RotationOutputViewModel.CellID(slotIndex: 0, position: .goalie))
+    }
+
+    @Test func tapSameCellTwiceDeselectsIt() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players)
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        vm.tapCell(slotIndex: 0, position: .goalie)
+        vm.tapCell(slotIndex: 0, position: .goalie)
+        #expect(vm.selectedCell == nil)
+    }
+
+    @Test func tapTwoDifferentCellsSwapsPlayers() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players)
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        let goalieID = players[0].id
+        let attackID = players[1].id
+
+        vm.tapCell(slotIndex: 0, position: .goalie)
+        vm.tapCell(slotIndex: 0, position: .attack)
+
+        let newGoalieID = vm.plan?.slots[0].assignments.first { $0.position == .goalie }?.playerID
+        let newAttackID = vm.plan?.slots[0].assignments.first { $0.position == .attack }?.playerID
+
+        #expect(newGoalieID == attackID)
+        #expect(newAttackID == goalieID)
+        #expect(vm.selectedCell == nil)
+    }
+
+    @Test func swapSetsCanUndo() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players)
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        vm.tapCell(slotIndex: 0, position: .goalie)
+        vm.tapCell(slotIndex: 0, position: .attack)
+
+        #expect(vm.canUndo == true)
+        #expect(vm.hasManualChanges == true)
+    }
+
+    @Test func undoRestoresPreviousPlan() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players)
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        let originalGoalieID = players[0].id
+
+        vm.tapCell(slotIndex: 0, position: .goalie)
+        vm.tapCell(slotIndex: 0, position: .attack)
+        vm.undo()
+
+        let restoredGoalieID = vm.plan?.slots[0].assignments.first { $0.position == .goalie }?.playerID
+        #expect(restoredGoalieID == originalGoalieID)
+        #expect(vm.canUndo == false)
+    }
+
+    // MARK: - Bench swap
+
+    @Test func benchSwapMovesPlayerFromBenchToField() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players)
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        let benchPlayerID = players[4].id
+        let displacedID = players[1].id // currently in attack
+
+        vm.initiateBenchSwap(slotIndex: 0, position: .attack)
+        #expect(vm.showBenchSwapSheet == true)
+
+        vm.confirmBenchSwap(benchPlayerID: benchPlayerID)
+
+        let newAttackID = vm.plan?.slots[0].assignments.first { $0.position == .attack }?.playerID
+        let bench = vm.plan?.slots[0].bench ?? []
+
+        #expect(newAttackID == benchPlayerID)
+        #expect(bench.contains(displacedID))
+        #expect(!bench.contains(benchPlayerID))
+        #expect(vm.showBenchSwapSheet == false)
+    }
+
+    // MARK: - Cell locking
+
+    @Test func toggleLockLocksCell() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players)
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        let cell = RotationOutputViewModel.CellID(slotIndex: 0, position: .goalie)
+        vm.toggleLock(cell: cell)
+
+        #expect(vm.isCellLocked(cell) == true)
+        #expect(vm.summaryLockedCount == 1)
+    }
+
+    @Test func toggleLockUnlocksLockedCell() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        var plan = makePlan(players: players)
+        plan.slots[0].assignments[0].isLocked = true
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        let cell = RotationOutputViewModel.CellID(slotIndex: 0, position: .goalie)
+        #expect(vm.isCellLocked(cell) == true)
+        vm.toggleLock(cell: cell)
+        #expect(vm.isCellLocked(cell) == false)
+    }
+
+    // MARK: - Remove player
+
+    @Test func removePlayerMovesThemToBench() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players)
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        let removedID = players[1].id // attack
+        let cell = RotationOutputViewModel.CellID(slotIndex: 0, position: .attack)
+        vm.removePlayer(at: cell)
+
+        let assignments = vm.plan?.slots[0].assignments ?? []
+        let bench = vm.plan?.slots[0].bench ?? []
+
+        #expect(!assignments.contains { $0.position == .attack })
+        #expect(bench.contains(removedID))
+        #expect(vm.canUndo == true)
+    }
+
+    // MARK: - Violations
+
+    @Test func dismissViolationMarksDismissed() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        var plan = makePlan(players: players)
+        plan.violations = [Violation.noEligiblePlayer(position: .midfield, quarter: 1, subIndex: 0)]
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        #expect(vm.activeViolations.count == 1)
+        vm.dismissViolation(at: 0)
+        #expect(vm.activeViolations.count == 0)
+    }
+}

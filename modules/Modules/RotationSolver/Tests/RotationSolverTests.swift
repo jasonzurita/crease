@@ -5,7 +5,6 @@ import Testing
 
 @Suite("RotationSolver")
 struct RotationSolverTests {
-
     // MARK: - Helpers
 
     private func makePlayer(
@@ -49,7 +48,7 @@ struct RotationSolverTests {
     }
 
     private func allPositionPlayers(count: Int, tier: Tier = .developing) -> [Player] {
-        (0..<count).map { i in
+        (0 ..< count).map { i in
             makePlayer(
                 id: UUID(),
                 name: "P\(i)",
@@ -216,7 +215,7 @@ struct RotationSolverTests {
 
     @Test func goalieSlotFilledByEligiblePlayer() {
         let goalie = makePlayer(positions: [.goalie])
-        let fillers = (0..<6).map { i in makePlayer(number: i + 10, positions: [.attack, .midfield, .defense]) }
+        let fillers = (0 ..< 6).map { i in makePlayer(number: i + 10, positions: [.attack, .midfield, .defense]) }
         let players = [goalie] + fillers
         let game = makeGame(players: players)
         let plan = RotationSolver.solve(game: game, players: players)
@@ -229,7 +228,7 @@ struct RotationSolverTests {
     }
 
     @Test func noEligibleGoalieCreatesViolation() {
-        let players = (0..<7).map { i in makePlayer(number: i, positions: [.attack, .midfield, .defense]) }
+        let players = (0 ..< 7).map { i in makePlayer(number: i, positions: [.attack, .midfield, .defense]) }
         let game = makeGame(players: players)
         let plan = RotationSolver.solve(game: game, players: players)
 
@@ -241,7 +240,7 @@ struct RotationSolverTests {
 
     @Test func noEligiblePlayerForPositionCreatesViolation() {
         // Only goalie-eligible players — no field eligibility
-        let players = (0..<7).map { i in makePlayer(number: i, positions: [.goalie]) }
+        let players = (0 ..< 7).map { i in makePlayer(number: i, positions: [.goalie]) }
         let game = makeGame(players: players)
         let plan = RotationSolver.solve(game: game, players: players)
 
@@ -322,7 +321,7 @@ struct RotationSolverTests {
 
     @Test func boostedPlayerGetsPriorityAssignment() {
         // 14 players, 4 quarters, 7v7, one boosted
-        var players = allPositionPlayers(count: 14)
+        let players = allPositionPlayers(count: 14)
         let boosted = players[0]
         let game = makeGame(players: players, mode: .fair, boostedPlayerIDs: [boosted.id])
         let plan = RotationSolver.solve(game: game, players: players)
@@ -345,7 +344,7 @@ struct RotationSolverTests {
         // 1 goalie-only player, 4 quarters, goalieTimeCountsAsFieldTime = true
         // Goalie plays all 4 slots × 10 min = 40 min >= 20 min → no violation
         let goalie = makePlayer(positions: [.goalie], tier: .elite)
-        let fillers = (0..<6).map { i in makePlayer(number: i + 10, positions: [.attack, .midfield, .defense], tier: .developing) }
+        let fillers = (0 ..< 6).map { i in makePlayer(number: i + 10, positions: [.attack, .midfield, .defense], tier: .developing) }
         let players = [goalie] + fillers
         let game = makeGame(
             players: players,
@@ -363,7 +362,7 @@ struct RotationSolverTests {
         // Same setup but goalieTimeCountsAsFieldTime = false
         // Goalie-only player gets 0 effective field minutes → violation
         let goalie = makePlayer(positions: [.goalie], tier: .elite)
-        let fillers = (0..<6).map { i in makePlayer(number: i + 10, positions: [.attack, .midfield, .defense], tier: .developing) }
+        let fillers = (0 ..< 6).map { i in makePlayer(number: i + 10, positions: [.attack, .midfield, .defense], tier: .developing) }
         let players = [goalie] + fillers
         let game = makeGame(
             players: players,
@@ -383,8 +382,8 @@ struct RotationSolverTests {
     @Test func competitiveModePacksTopTierInKeySlot() {
         // 4 elite + 10 developing players, 2 quarters, 7v7, competitive mode
         // Sub-index 0 of each quarter is the "key" slot → expect elites prioritized there
-        let elites = (0..<4).map { i in makePlayer(number: i, positions: [.attack, .midfield, .defense, .goalie], tier: .elite) }
-        let developing = (0..<10).map { i in makePlayer(number: i + 10, positions: [.attack, .midfield, .defense, .goalie], tier: .developing) }
+        let elites = (0 ..< 4).map { i in makePlayer(number: i, positions: [.attack, .midfield, .defense, .goalie], tier: .elite) }
+        let developing = (0 ..< 10).map { i in makePlayer(number: i + 10, positions: [.attack, .midfield, .defense, .goalie], tier: .developing) }
         let players = elites + developing
         let game = makeGame(
             players: players,
@@ -426,5 +425,58 @@ struct RotationSolverTests {
         )
         let plan = RotationSolver.solve(game: game, players: players)
         #expect(plan.slots.isEmpty)
+    }
+
+    // MARK: - Locked cells
+
+    @Test func lockedCellPreservedDuringRegeneration() {
+        let players = allPositionPlayers(count: 7)
+        var game = makeGame(players: players)
+        var initialPlan = RotationSolver.solve(game: game, players: players)
+
+        guard let goalieIndex = initialPlan.slots[0].assignments
+            .firstIndex(where: { $0.position == .goalie }) else {
+            Issue.record("No goalie assignment found")
+            return
+        }
+        let lockedGoalieID = initialPlan.slots[0].assignments[goalieIndex].playerID
+        initialPlan.slots[0].assignments[goalieIndex].isLocked = true
+        game.rotationPlan = initialPlan
+
+        let newPlan = RotationSolver.solve(game: game, players: players)
+
+        let newGoalieID = newPlan.slots[0].assignments.first { $0.position == .goalie }?.playerID
+        #expect(newGoalieID == lockedGoalieID)
+        let stillLocked = newPlan.slots[0].assignments.first { $0.position == .goalie }?.isLocked ?? false
+        #expect(stillLocked == true)
+    }
+
+    @Test func lockedAbsentPlayerIsNotPreserved() {
+        let players = allPositionPlayers(count: 7)
+        var game = makeGame(players: players)
+        var initialPlan = RotationSolver.solve(game: game, players: players)
+
+        guard let goalieIndex = initialPlan.slots[0].assignments
+            .firstIndex(where: { $0.position == .goalie }) else {
+            Issue.record("No goalie assignment found")
+            return
+        }
+        let absentGoalieID = initialPlan.slots[0].assignments[goalieIndex].playerID
+        initialPlan.slots[0].assignments[goalieIndex].isLocked = true
+        game.rotationPlan = initialPlan
+
+        var attendance = game.attendance
+        if let attIdx = attendance.firstIndex(where: { $0.id == absentGoalieID }) {
+            attendance[attIdx] = PlayerAttendance(
+                id: absentGoalieID, isPresent: false,
+                lateArrivalQuarter: nil, earlyDepartureQuarter: nil
+            )
+        }
+        game.attendance = attendance
+
+        let newPlan = RotationSolver.solve(game: game, players: players)
+
+        let newGoalieID = newPlan.slots[0].assignments.first { $0.position == .goalie }?.playerID
+        #expect(newGoalieID != absentGoalieID)
     }
 }
