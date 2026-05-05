@@ -24,6 +24,17 @@ public struct RotationSolver: Sendable {
             playerIDs: presentPlayers.map { $0.id }
         )
 
+        var lockedBySlot: [String: [PositionAssignment]] = [:]
+        if let existing = game.rotationPlan {
+            for slot in existing.slots {
+                let key = slotKey(quarter: slot.quarter, subIndex: slot.subIndex)
+                let locked = slot.assignments.filter { $0.isLocked }
+                if !locked.isEmpty {
+                    lockedBySlot[key] = locked
+                }
+            }
+        }
+
         var effectiveSlotsPlayed: [UUID: Int] = [:]
         var rotationSlots: [RotationSlot] = []
         var violations: [Violation] = []
@@ -38,9 +49,21 @@ public struct RotationSolver: Sendable {
             var assignedIDs: Set<UUID> = []
             var assignments: [PositionAssignment] = []
 
+            let locked = lockedBySlot[slotKey(quarter: quarter, subIndex: subIndex)] ?? []
+            for lockedAssignment in locked {
+                if availableNow.contains(where: { $0.id == lockedAssignment.playerID }) {
+                    assignedIDs.insert(lockedAssignment.playerID)
+                    assignments.append(lockedAssignment)
+                }
+            }
+
             for position in [Position.goalie, .attack, .midfield, .defense] {
-                let count = slotCounts[position] ?? 0
-                guard count > 0 else { continue }
+                let total = slotCounts[position] ?? 0
+                guard total > 0 else { continue }
+
+                let alreadyFilled = assignments.filter { $0.position == position }.count
+                let needed = total - alreadyFilled
+                guard needed > 0 else { continue }
 
                 let eligible = availableNow.filter {
                     !assignedIDs.contains($0.id) && $0.positions.contains(position)
@@ -55,14 +78,16 @@ public struct RotationSolver: Sendable {
                     boostedIDs: boostedIDs
                 )
 
-                let toAssign = min(count, sorted.count)
+                let toAssign = min(needed, sorted.count)
                 for i in 0..<toAssign {
                     let player = sorted[i]
                     assignedIDs.insert(player.id)
-                    assignments.append(PositionAssignment(position: position, playerID: player.id))
+                    assignments.append(
+                        PositionAssignment(position: position, playerID: player.id, isLocked: false)
+                    )
                 }
 
-                for _ in toAssign..<count {
+                for _ in toAssign..<needed {
                     violations.append(.noEligiblePlayer(position: position, quarter: quarter, subIndex: subIndex))
                 }
             }
@@ -103,6 +128,10 @@ public struct RotationSolver: Sendable {
     }
 
     // MARK: - Private helpers
+
+    private static func slotKey(quarter: Int, subIndex: Int) -> String {
+        "\(quarter)-\(subIndex)"
+    }
 
     private static func makeSchedule(
         format: GameFormatDefaults,
