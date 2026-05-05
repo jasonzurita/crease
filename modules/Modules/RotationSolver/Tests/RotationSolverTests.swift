@@ -24,7 +24,7 @@ struct RotationSolverTests {
     private func makeGame(
         players: [Player],
         attendance: [PlayerAttendance]? = nil,
-        format: GameFormatDefaults = GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 7, midQuarterSubsEnabled: true),
+        format: GameFormatDefaults = GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 7),
         rotationStyle: RotationStyle = .byQuarter,
         fairnessTargets: FairnessTargets = FairnessTargets(eliteMinutes: 20, strongMinutes: 18, developingMinutes: 15, learningMinutes: 12, beginnerMinutes: 10, goalieTimeCountsAsFieldTime: true),
         mode: CompetitivenessMode = .fair,
@@ -65,7 +65,7 @@ struct RotationSolverTests {
         let players = allPositionPlayers(count: 7)
         let game = makeGame(
             players: players,
-            format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 7, midQuarterSubsEnabled: true)
+            format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 7)
         )
         let plan = RotationSolver.solve(game: game, players: players)
         #expect(plan.slots.count == 4)
@@ -77,7 +77,7 @@ struct RotationSolverTests {
         let players = allPositionPlayers(count: 7)
         let game = makeGame(
             players: players,
-            format: GameFormatDefaults(quarters: 2, quarterLengthMinutes: 10, playersPerSide: 7, midQuarterSubsEnabled: true),
+            format: GameFormatDefaults(quarters: 2, quarterLengthMinutes: 10, playersPerSide: 7),
             rotationStyle: .byTimeInterval(intervalMinutes: 5)
         )
         let plan = RotationSolver.solve(game: game, players: players)
@@ -90,7 +90,7 @@ struct RotationSolverTests {
         let players = allPositionPlayers(count: 7)
         let game = makeGame(
             players: players,
-            format: GameFormatDefaults(quarters: 1, quarterLengthMinutes: 9, playersPerSide: 7, midQuarterSubsEnabled: true),
+            format: GameFormatDefaults(quarters: 1, quarterLengthMinutes: 9, playersPerSide: 7),
             rotationStyle: .byTimeInterval(intervalMinutes: 3)
         )
         let plan = RotationSolver.solve(game: game, players: players)
@@ -256,7 +256,7 @@ struct RotationSolverTests {
         let players = allPositionPlayers(count: 14, tier: .elite)
         let game = makeGame(
             players: players,
-            format: GameFormatDefaults(quarters: 2, quarterLengthMinutes: 10, playersPerSide: 7, midQuarterSubsEnabled: false),
+            format: GameFormatDefaults(quarters: 2, quarterLengthMinutes: 10, playersPerSide: 7),
             fairnessTargets: FairnessTargets(eliteMinutes: 20, strongMinutes: 18, developingMinutes: 15, learningMinutes: 12, beginnerMinutes: 10, goalieTimeCountsAsFieldTime: true)
         )
         let plan = RotationSolver.solve(game: game, players: players)
@@ -270,7 +270,7 @@ struct RotationSolverTests {
         let players = allPositionPlayers(count: 7, tier: .elite)
         let game = makeGame(
             players: players,
-            format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 7, midQuarterSubsEnabled: true),
+            format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 7),
             fairnessTargets: FairnessTargets(eliteMinutes: 20, strongMinutes: 18, developingMinutes: 15, learningMinutes: 12, beginnerMinutes: 10, goalieTimeCountsAsFieldTime: true)
         )
         let plan = RotationSolver.solve(game: game, players: players)
@@ -387,7 +387,7 @@ struct RotationSolverTests {
         let players = elites + developing
         let game = makeGame(
             players: players,
-            format: GameFormatDefaults(quarters: 2, quarterLengthMinutes: 10, playersPerSide: 7, midQuarterSubsEnabled: true),
+            format: GameFormatDefaults(quarters: 2, quarterLengthMinutes: 10, playersPerSide: 7),
             mode: .competitive
         )
         let plan = RotationSolver.solve(game: game, players: players)
@@ -406,7 +406,7 @@ struct RotationSolverTests {
         let players = allPositionPlayers(count: 14)
         let game = makeGame(
             players: players,
-            format: GameFormatDefaults(quarters: 1, quarterLengthMinutes: 10, playersPerSide: 7, midQuarterSubsEnabled: true)
+            format: GameFormatDefaults(quarters: 1, quarterLengthMinutes: 10, playersPerSide: 7)
         )
         let plan = RotationSolver.solve(game: game, players: players)
 
@@ -421,7 +421,7 @@ struct RotationSolverTests {
         let players = allPositionPlayers(count: 7)
         let game = makeGame(
             players: players,
-            format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 0, midQuarterSubsEnabled: true)
+            format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 0)
         )
         let plan = RotationSolver.solve(game: game, players: players)
         #expect(plan.slots.isEmpty)

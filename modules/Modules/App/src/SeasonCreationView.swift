@@ -70,16 +70,6 @@ public struct SeasonCreationView: View {
                 stepperRow(label: "Quarter Length", value: $viewModel.gameFormatDefaults.quarterLengthMinutes, range: 5 ... 20, unit: "min")
                 divider
                 stepperRow(label: "Players Per Side", value: $viewModel.gameFormatDefaults.playersPerSide, range: 5 ... 11, unit: nil)
-                divider
-                HStack {
-                    Text("Mid-Quarter Subs")
-                        .foregroundStyle(Color.crTextPrimary)
-                    Spacer()
-                    Toggle("", isOn: $viewModel.gameFormatDefaults.midQuarterSubsEnabled)
-                        .tint(Color.crAccent)
-                        .labelsHidden()
-                }
-                .padding()
             }
             .crSurfaceCard()
         }

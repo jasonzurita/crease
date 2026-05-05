@@ -130,7 +130,6 @@ struct GameFormatDefaultsTests {
         #expect(defaults.quarters == 4)
         #expect(defaults.quarterLengthMinutes == 10)
         #expect(defaults.playersPerSide == 7)
-        #expect(defaults.midQuarterSubsEnabled == true)
     }
 
     @Test func codableRoundTrip() throws {
@@ -188,7 +187,7 @@ struct GameTests {
     }
 
     @Test func attendancePreservedRoundTrip() throws {
-        let playerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let playerID = try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000002"))
         var game = makeGame()
         game.attendance = [PlayerAttendance(id: playerID, isPresent: true, lateArrivalQuarter: 2, earlyDepartureQuarter: nil)]
         let encoder = JSONEncoder()

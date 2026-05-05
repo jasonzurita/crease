@@ -431,7 +431,7 @@ struct RotationOutputViewModelTests {
     }
 
     private func makePlayers() -> [Player] {
-        (0..<6).map { i in
+        (0 ..< 6).map { i in
             Player(
                 id: UUID(),
                 name: "Player \(i)",
@@ -455,7 +455,7 @@ struct RotationOutputViewModelTests {
                         PositionAssignment(position: .defense, playerID: players[3].id, isLocked: false),
                     ],
                     bench: [players[4].id, players[5].id]
-                )
+                ),
             ],
             violations: []
         )
@@ -474,8 +474,7 @@ struct RotationOutputViewModelTests {
             format: GameFormatDefaults(
                 quarters: 1,
                 quarterLengthMinutes: 10,
-                playersPerSide: 5,
-                midQuarterSubsEnabled: false
+                playersPerSide: 5
             ),
             rotationStyle: .byQuarter,
             fairnessTargets: FairnessTargets(
@@ -722,6 +721,6 @@ struct RotationOutputViewModelTests {
 
         #expect(vm.activeViolations.count == 1)
         vm.dismissViolation(at: 0)
-        #expect(vm.activeViolations.count == 0)
+        #expect(vm.activeViolations.isEmpty)
     }
 }

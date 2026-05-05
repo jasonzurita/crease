@@ -23,7 +23,6 @@ struct GameOptionsView: View {
         }
     }
 
-    @ViewBuilder
     private var formatSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Format")
@@ -31,14 +30,14 @@ struct GameOptionsView: View {
                 .foregroundStyle(Color.crTextPrimary)
 
             VStack(spacing: 0) {
-                Stepper("Quarters: \(viewModel.format.quarters)", value: $viewModel.format.quarters, in: 1...8)
+                Stepper("Quarters: \(viewModel.format.quarters)", value: $viewModel.format.quarters, in: 1 ... 8)
                     .foregroundStyle(Color.crTextPrimary)
                     .padding(.vertical, 4)
                 Divider().background(Color.crTextSecondary.opacity(0.2))
                 Stepper(
                     "Quarter Length: \(viewModel.format.quarterLengthMinutes) min",
                     value: $viewModel.format.quarterLengthMinutes,
-                    in: 1...60
+                    in: 1 ... 60
                 )
                 .foregroundStyle(Color.crTextPrimary)
                 .padding(.vertical, 4)
@@ -46,21 +45,16 @@ struct GameOptionsView: View {
                 Stepper(
                     "Players Per Side: \(viewModel.format.playersPerSide)",
                     value: $viewModel.format.playersPerSide,
-                    in: 1...15
+                    in: 1 ... 15
                 )
                 .foregroundStyle(Color.crTextPrimary)
                 .padding(.vertical, 4)
-                Divider().background(Color.crTextSecondary.opacity(0.2))
-                Toggle("Mid-Quarter Subs", isOn: $viewModel.format.midQuarterSubsEnabled)
-                    .foregroundStyle(Color.crTextPrimary)
-                    .padding(.vertical, 4)
             }
             .padding(.horizontal)
             .crSurfaceCard()
         }
     }
 
-    @ViewBuilder
     private var rotationStyleSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Rotation Style")
@@ -74,7 +68,7 @@ struct GameOptionsView: View {
                 }
                 .pickerStyle(.segmented)
 
-                if case .byTimeInterval(let minutes) = viewModel.rotationStyle {
+                if case let .byTimeInterval(minutes) = viewModel.rotationStyle {
                     VStack(spacing: 8) {
                         Stepper(
                             "Interval: \(minutes) min",
@@ -82,7 +76,7 @@ struct GameOptionsView: View {
                                 get: { minutes },
                                 set: { viewModel.rotationStyle = .byTimeInterval(intervalMinutes: $0) }
                             ),
-                            in: 1...max(1, viewModel.format.quarterLengthMinutes)
+                            in: 1 ... max(1, viewModel.format.quarterLengthMinutes)
                         )
                         .foregroundStyle(Color.crTextPrimary)
 
@@ -101,7 +95,6 @@ struct GameOptionsView: View {
         }
     }
 
-    @ViewBuilder
     private var fairnessSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Minimum Playing Time")
@@ -113,7 +106,7 @@ struct GameOptionsView: View {
                     Stepper(
                         "\(tier.rawValue): \(viewModel.fairnessTargets.minutes(for: tier)) min",
                         value: minutesBinding(for: tier),
-                        in: 0...60
+                        in: 0 ... 60
                     )
                     .foregroundStyle(Color.crTextPrimary)
                     .padding(.vertical, 4)
@@ -131,7 +124,6 @@ struct GameOptionsView: View {
         }
     }
 
-    @ViewBuilder
     private var prioritiesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
