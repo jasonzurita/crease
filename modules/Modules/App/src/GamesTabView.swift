@@ -29,6 +29,14 @@ public struct GamesTabView: View {
                 }
             }
             .navigationTitle("Games")
+            .navigationDestination(for: Game.self) { game in
+                RotationOutputView(
+                    game: game,
+                    players: store.players,
+                    store: store,
+                    showDoneButton: false
+                )
+            }
             .toolbarBackground(Color.crSurface, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
@@ -100,30 +108,34 @@ public struct GamesTabView: View {
             if !activeGames.isEmpty {
                 Section("Upcoming") {
                     ForEach(activeGames) { game in
-                        GameRowView(game: game)
-                            .listRowBackground(Color.crSurface)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    gameToDelete = game
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
+                        NavigationLink(value: game) {
+                            GameRowView(game: game)
+                        }
+                        .listRowBackground(Color.crSurface)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                gameToDelete = game
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
+                        }
                     }
                 }
             }
             if !completedGames.isEmpty {
                 Section("Completed") {
                     ForEach(completedGames) { game in
-                        GameRowView(game: game)
-                            .listRowBackground(Color.crSurface)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    gameToDelete = game
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
+                        NavigationLink(value: game) {
+                            GameRowView(game: game)
+                        }
+                        .listRowBackground(Color.crSurface)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                gameToDelete = game
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
+                        }
                     }
                 }
             }

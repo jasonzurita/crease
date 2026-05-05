@@ -1,4 +1,5 @@
 import CRDesign
+import CRModel
 import SwiftUI
 
 public struct GameSetupView: View {
@@ -6,6 +7,7 @@ public struct GameSetupView: View {
     private let store: SeasonStore
     @Environment(\.dismiss) private var dismiss
     @State private var errorMessage: String?
+    @State private var generatedGame: Game?
 
     public init(store: SeasonStore) {
         self.store = store
@@ -23,9 +25,7 @@ public struct GameSetupView: View {
                     stepIndicator
                         .padding(.top, 16)
                         .padding(.horizontal, 32)
-
                     stepContent
-
                     navigationButtons
                         .padding()
                 }
@@ -39,6 +39,14 @@ public struct GameSetupView: View {
                     Button("Cancel") { dismiss() }
                         .foregroundStyle(Color.crTextSecondary)
                 }
+            }
+            .navigationDestination(item: $generatedGame) { game in
+                RotationOutputView(
+                    game: game,
+                    players: store.players,
+                    store: store,
+                    showDoneButton: true
+                )
             }
         }
         .alert("Could Not Create Game", isPresented: Binding(
@@ -122,14 +130,9 @@ public struct GameSetupView: View {
 
             if viewModel.currentStep == .options {
                 Button {
-                    do {
-                        try viewModel.createGame(in: store)
-                        dismiss()
-                    } catch {
-                        errorMessage = error.localizedDescription
-                    }
+                    generatePlan()
                 } label: {
-                    Text("Save Game")
+                    Text("Generate Plan")
                         .font(.headline)
                         .foregroundStyle(Color.crBackground)
                         .frame(maxWidth: .infinity)
@@ -155,6 +158,16 @@ public struct GameSetupView: View {
                 }
                 .disabled(!viewModel.isCurrentStepValid)
             }
+        }
+    }
+
+    private func generatePlan() {
+        do {
+            let game = try viewModel.createGame(in: store)
+            try store.generatePlan(for: game)
+            generatedGame = store.games.first { $0.id == game.id }
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }

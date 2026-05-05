@@ -60,7 +60,8 @@ final class GameSetupViewModel {
         }
     }
 
-    func createGame(in store: SeasonStore) throws {
+    @discardableResult
+    func createGame(in store: SeasonStore) throws -> Game {
         let game = Game(
             id: UUID(),
             opponent: opponent.trimmingCharacters(in: .whitespaces),
@@ -76,6 +77,7 @@ final class GameSetupViewModel {
             createdAt: Date()
         )
         try store.createGame(game)
+        return game
     }
 
     private static func nextSunday() -> Date {
