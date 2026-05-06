@@ -54,7 +54,7 @@ All products and targets use the `CR` prefix. BasicClients omit the prefix.
 
 ## Dependency Injection
 
-Dependencies use the struct-of-closures (client) pattern. Use `/create-swift-client` to scaffold new clients.
+Use `/create-swift-client` to scaffold new clients.
 
 `World` holds broadly-needed system abstractions (`currentDate`, `fileManagerClient`, `userDefaultsClient`, `applicationClient`). Add to `World` only if 3+ modules need the same client directly.
 
@@ -62,13 +62,13 @@ Dependencies use the struct-of-closures (client) pattern. Use `/create-swift-cli
 
 ## State Management
 
-Default: `@Observable` MVVM. `SeasonStore` is the central `@Observable` class injected into the SwiftUI environment at the app root. All mutations go through it and immediately write to disk.
+`SeasonStore` is the central `@Observable` class injected into the SwiftUI environment at the app root. All mutations go through it and immediately write to disk.
 
 Use an action-based reducer only for features with complex, interdependent state transitions (e.g. the rotation output screen with undo, locking, and swap modes).
 
 ## Testing
 
-Tests are mandatory for all feature work and bug fixes. Each module has a `.testTarget` in `Package.swift` and a `.xctestplan` in `TestPlans/`.
+Each module has a `.testTarget` in `Package.swift` and a `.xctestplan` in `TestPlans/`.
 
 The rotation solver (Phase 4) is pure Swift with zero UI dependencies and requires a full unit test suite covering all constraint combinations before it is considered done.
 
@@ -180,11 +180,6 @@ General rules for every phase:
 
 ## Key Conventions
 
-- **One type per file** — even small helpers
-- **No default parameter values** unless there is a clear, obvious reason
-- **Constants must be `private`** unless part of a public interface
-- **No `TODO` comments in committed code** — use GitHub issues instead
-- **Logging**: use `os.Logger` per module — never `print()`
 - **iOS 26 only** — no backwards-compatibility shims for earlier versions
 - **Offline-first** — no network calls in v1; all data is local
 - The rotation solver must have zero UI dependencies — pure Swift, fully unit-testable in isolation
