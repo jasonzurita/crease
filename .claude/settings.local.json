@@ -14,7 +14,21 @@
       "Bash(cp ~/Code/set-hike-flag-football/modules/Modules/BasicClients/UserDefaultsClient/src/Mocks.swift /Users/zurita/Code/crease/modules/Modules/BasicClients/UserDefaultsClient/src/Mocks.swift)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Skill(update-config)",
+      "Bash(xcodebuild test *)",
+      "Bash(xcodebuild *)",
+      "Bash(git -C /Users/zurita/Code/crease diff --stat HEAD)",
+      "Bash(git -C /Users/zurita/Code/crease status --short)",
+      "Bash(git -C /Users/zurita/Code/crease add modules/Modules/Model/src/Position.swift modules/Modules/Model/src/Tier.swift modules/Modules/Model/src/Player.swift modules/Modules/App/src/PlayerFormViewModel.swift modules/Modules/App/src/PlayerFormView.swift modules/Modules/App/src/PlayerRowView.swift modules/Modules/App/src/SeasonStore.swift modules/Modules/App/src/RosterTabView.swift modules/Modules/App/src/MainTabView.swift modules/Modules/App/Tests/CRAppTests.swift modules/Modules/Model/Tests/CRModelTests.swift)",
+      "Bash(git -C /Users/zurita/Code/crease commit -m ' *)",
+      "Bash(git -C /Users/zurita/Code/crease status)",
+      "Bash(git -C /Users/zurita/Code/crease add modules/Modules/Model/src/Game.swift modules/Modules/Model/src/GameStatus.swift modules/Modules/Model/src/CompetitivenessMode.swift modules/Modules/Model/src/RotationStyle.swift modules/Modules/Model/src/FairnessTargets.swift modules/Modules/Model/src/PlayerAttendance.swift modules/Modules/Model/Tests/CRModelTests.swift modules/Modules/App/src/SeasonStore.swift modules/Modules/App/src/GamesTabView.swift modules/Modules/App/src/GameRowView.swift modules/Modules/App/src/GameSetupViewModel.swift modules/Modules/App/src/GameSetupView.swift modules/Modules/App/src/GameDetailsView.swift modules/Modules/App/src/AttendanceView.swift modules/Modules/App/src/AttendancePlayerCard.swift modules/Modules/App/src/PlayerAttendanceSheet.swift modules/Modules/App/src/GameOptionsView.swift modules/Modules/App/Tests/CRAppTests.swift)",
+      "Bash(git -C /Users/zurita/Code/crease add modules/Modules/Model/src/PositionAssignment.swift modules/Modules/Model/src/RotationPlan.swift modules/Modules/Model/src/RotationSlot.swift modules/Modules/Model/src/Violation.swift modules/Modules/RotationSolver/ modules/Modules/App/src/SeasonStore.swift modules/Modules/Model/src/Game.swift modules/Package.swift)",
+      "Bash(swift test *)",
+      "Bash(find ~/Library/Developer/Xcode/DerivedData/crease*/info.plist)",
+      "mcp__xcode__XcodeListNavigatorIssues",
+      "Bash(xargs cat *)"
     ]
   }
 }

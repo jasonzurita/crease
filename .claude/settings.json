@@ -1,0 +1,44 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Skill(update-config)",
+      "mcp__xcode__XcodeListWindows",
+      "mcp__xcode__BuildProject",
+      "mcp__xcode__RunSomeTests",
+      "mcp__xcode__GetTestList",
+      "mcp__xcode__RunAllTests",
+      "mcp__xcode__XcodeGrep",
+      "mcp__xcode__XcodeRead",
+      "mcp__xcode__DocumentationSearch"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "xcode"
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "brew outdated swiftformat | grep -q swiftformat && brew upgrade swiftformat 2>/dev/null; brew list swiftformat &>/dev/null || brew install swiftformat 2>/dev/null; true",
+            "statusMessage": "Checking SwiftFormat version..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // empty' | { read -r f; [[ \"$f\" == *.swift ]] && swiftformat \"$f\" --config .swiftformat --quiet; } 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}
