@@ -142,6 +142,67 @@ public final class SeasonStore {
         try updateGame(updated)
     }
 
+    public func completeGame(_ game: Game, stats: GameStats?) throws {
+        var updated = game
+        updated.status = .complete
+        updated.stats = stats
+        try updateGame(updated)
+    }
+
+    // MARK: - Seasons
+
+    public func updateSeason(_ season: Season) throws {
+        guard let index = seasons.firstIndex(where: { $0.id == season.id }) else { return }
+        seasons[index] = season
+        if activeSeason?.id == season.id {
+            activeSeason = season
+        }
+        try persistenceClient.save(season, season.id.uuidString)
+    }
+
+    public func deleteSeason(_ season: Season) throws {
+        try persistenceClient.delete(season.id.uuidString)
+        seasons.removeAll { $0.id == season.id }
+        if activeSeason?.id == season.id {
+            if let next = seasons.first {
+                setActive(next)
+            } else {
+                activeSeason = nil
+                players = []
+                games = []
+            }
+        }
+    }
+
+    public func exportSeasonZip(_ season: Season) throws -> URL {
+        guard let seasonDir = seasonsURL?.appending(component: season.id.uuidString) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        var files: [(name: String, data: Data)] = []
+        let enumerator = FileManager.default.enumerator(
+            at: seasonDir,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        )
+        let base = seasonDir.path
+        while let fileURL = enumerator?.nextObject() as? URL {
+            let vals = try? fileURL.resourceValues(forKeys: [.isRegularFileKey])
+            guard vals?.isRegularFile == true else { continue }
+            guard let data = FileManager.default.contents(atPath: fileURL.path) else { continue }
+            let rel = String(fileURL.path.dropFirst(base.count + 1))
+            files.append((name: "\(season.seasonName)/\(rel)", data: data))
+        }
+        let zipData = ZIPCreator.createArchive(containing: files)
+        let safe = season.seasonName
+            .components(separatedBy: CharacterSet.alphanumerics.union(.init(charactersIn: "-_ ")).inverted)
+            .joined()
+            .replacingOccurrences(of: " ", with: "_")
+        let tempURL = FileManager.default.temporaryDirectory
+            .appending(component: "\(safe).zip")
+        try zipData.write(to: tempURL, options: .atomic)
+        return tempURL
+    }
+
     // MARK: - Private
 
     private func rosterURL(for season: Season) -> URL? {

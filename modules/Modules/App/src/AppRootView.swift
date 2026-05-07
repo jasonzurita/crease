@@ -10,13 +10,18 @@ public struct AppRootView: View {
     }
 
     public var body: some View {
-        switch viewModel.route {
-        case .seasonCreation:
-            SeasonCreationView(store: viewModel.store) {
-                viewModel.route = .mainApp
+        Group {
+            switch viewModel.route {
+            case .seasonCreation:
+                SeasonCreationView(store: viewModel.store) {
+                    viewModel.route = .mainApp
+                }
+            case .mainApp:
+                MainTabView(store: viewModel.store)
             }
-        case .mainApp:
-            MainTabView(store: viewModel.store)
+        }
+        .onChange(of: viewModel.store.activeSeason == nil) { _, isNil in
+            if isNil { viewModel.route = .seasonCreation }
         }
     }
 }

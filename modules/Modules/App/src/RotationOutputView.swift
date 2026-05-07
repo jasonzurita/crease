@@ -3,7 +3,10 @@ import CRModel
 import SwiftUI
 
 public struct RotationOutputView: View {
+    private enum GamePlanTab { case rotation, breakdown }
+
     @State private var viewModel: RotationOutputViewModel
+    @State private var activeTab: GamePlanTab = .rotation
     @Environment(\.dismiss) private var dismiss
     private let showDoneButton: Bool
 
@@ -73,22 +76,40 @@ public struct RotationOutputView: View {
         } message: {
             Text("Unlocked manual changes will be lost. Locked cells are preserved.")
         }
+        .sheet(isPresented: $viewModel.showLineupCardOptions) {
+            LineupCardOptionsSheet(viewModel: viewModel)
+                .presentationDetents([.large])
+        }
+        .sheet(isPresented: $viewModel.showCompletionSheet) {
+            CompletionSheet(presentPlayers: viewModel.presentPlayers) { stats in
+                viewModel.markComplete(stats: stats)
+            }
+        }
+        .onChange(of: viewModel.gameWasCompleted) { _, completed in
+            if completed { dismiss() }
+        }
     }
 
     @ViewBuilder
     private var mainContent: some View {
         if let plan = viewModel.plan {
             VStack(spacing: 0) {
-                if !viewModel.activeViolations.isEmpty {
-                    violationBannerStack
+                tabPicker
+                Divider().background(Color.crTextSecondary.opacity(0.15))
+                if activeTab == .rotation {
+                    if !viewModel.activeViolations.isEmpty {
+                        violationBannerStack
+                    }
+                    rotationGrid(plan)
+                    Divider().background(Color.crTextSecondary.opacity(0.2))
+                    PlayingTimeBarsView(viewModel: viewModel)
+                    SummaryStripView(viewModel: viewModel)
+                } else {
+                    PlayingTimeBreakdownView(viewModel: viewModel)
                 }
-                rotationGrid(plan)
-                Divider().background(Color.crTextSecondary.opacity(0.2))
-                PlayingTimeBarsView(viewModel: viewModel)
-                SummaryStripView(viewModel: viewModel)
             }
             .overlay(alignment: .bottom) {
-                if viewModel.canUndo {
+                if viewModel.canUndo && activeTab == .rotation {
                     undoButton
                         .padding(.bottom, 80)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -100,10 +121,21 @@ public struct RotationOutputView: View {
         }
     }
 
+    private var tabPicker: some View {
+        Picker("View", selection: $activeTab) {
+            Text("Rotation").tag(GamePlanTab.rotation)
+            Text("Breakdown").tag(GamePlanTab.breakdown)
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.crSurface)
+    }
+
     private var violationBannerStack: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 4) {
-                ForEach(Array(viewModel.activeViolations.enumerated()), id: \.offset) { index, violation in
+                ForEach(Array(viewModel.activeViolations.enumerated()), id: \.offset) { _, violation in
                     ViolationBannerView(
                         violation: violation,
                         players: viewModel.players
@@ -304,6 +336,7 @@ public struct RotationOutputView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button("Done") { dismiss() }
                     .foregroundStyle(Color.crAccent)
+                    .accessibilityLabel("Done, return to game list")
             }
         }
         ToolbarItem(placement: showDoneButton ? .secondaryAction : .primaryAction) {
@@ -313,6 +346,29 @@ public struct RotationOutputView: View {
                 Image(systemName: "arrow.clockwise")
             }
             .foregroundStyle(Color.crAccent)
+            .accessibilityLabel("Regenerate rotation plan")
+        }
+        if viewModel.plan != nil {
+            ToolbarItem(placement: .secondaryAction) {
+                Button {
+                    viewModel.showLineupCardOptions = true
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .foregroundStyle(Color.crAccent)
+                .accessibilityLabel("Share lineup card")
+            }
+            if viewModel.game.status != .complete {
+                ToolbarItem(placement: .secondaryAction) {
+                    Button {
+                        viewModel.showCompletionSheet = true
+                    } label: {
+                        Image(systemName: "checkmark.circle")
+                    }
+                    .foregroundStyle(Color.crSuccess)
+                    .accessibilityLabel("Mark game complete")
+                }
+            }
         }
     }
 }

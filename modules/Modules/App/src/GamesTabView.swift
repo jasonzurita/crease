@@ -30,12 +30,20 @@ public struct GamesTabView: View {
             }
             .navigationTitle("Games")
             .navigationDestination(for: Game.self) { game in
-                RotationOutputView(
-                    game: game,
-                    players: store.players,
-                    store: store,
-                    showDoneButton: false
-                )
+                if game.status == .complete {
+                    PostGameSummaryView(
+                        game: game,
+                        players: store.players,
+                        teamName: store.activeSeason?.teamName ?? ""
+                    )
+                } else {
+                    RotationOutputView(
+                        game: game,
+                        players: store.players,
+                        store: store,
+                        showDoneButton: false
+                    )
+                }
             }
             .toolbarBackground(Color.crSurface, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
@@ -102,7 +110,6 @@ public struct GamesTabView: View {
         .padding()
     }
 
-    @ViewBuilder
     private var gameList: some View {
         List {
             if !activeGames.isEmpty {

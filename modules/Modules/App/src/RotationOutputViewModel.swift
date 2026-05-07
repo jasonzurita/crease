@@ -8,7 +8,9 @@ final class RotationOutputViewModel {
     struct CellID: Hashable, Identifiable {
         let slotIndex: Int
         let position: Position
-        var id: String { "\(slotIndex)-\(position.rawValue)" }
+        var id: String {
+            "\(slotIndex)-\(position.rawValue)"
+        }
     }
 
     enum MinutesStatus { case met, near, violation }
@@ -28,13 +30,27 @@ final class RotationOutputViewModel {
     private(set) var hasManualChanges = false
     var showRegenerateWarning = false
 
+    // Phase 7 — Lineup card
+    var showLineupCardOptions = false
+    var lineupCardIncludesPlayingTime = true
+
+    // Phase 8 — Completion
+    var showCompletionSheet = false
+    private(set) var gameWasCompleted = false
+
+    var teamName: String {
+        store.activeSeason?.teamName ?? ""
+    }
+
     init(game: Game, players: [Player], store: SeasonStore) {
         self.game = game
         self.players = players
         self.store = store
     }
 
-    var plan: RotationPlan? { game.rotationPlan }
+    var plan: RotationPlan? {
+        game.rotationPlan
+    }
 
     var activeViolations: [Violation] {
         game.rotationPlan?.violations.filter { !$0.isDismissed } ?? []
@@ -52,7 +68,7 @@ final class RotationOutputViewModel {
     var slotDurationMinutes: Int {
         switch game.rotationStyle {
         case .byQuarter: return game.format.quarterLengthMinutes
-        case .byTimeInterval(let intervalMinutes): return intervalMinutes
+        case let .byTimeInterval(intervalMinutes): return intervalMinutes
         }
     }
 
@@ -61,7 +77,7 @@ final class RotationOutputViewModel {
         let slots = plan.slots.filter { slot in
             slot.assignments.contains { pa in
                 pa.playerID == playerID &&
-                (pa.position != .goalie || game.fairnessTargets.goalieTimeCountsAsFieldTime)
+                    (pa.position != .goalie || game.fairnessTargets.goalieTimeCountsAsFieldTime)
             }
         }.count
         return slots * slotDurationMinutes
@@ -106,6 +122,96 @@ final class RotationOutputViewModel {
         }
     }
 
+    // MARK: - Breakdown
+
+    enum BreakdownSort: String, CaseIterable {
+        case byMinutes = "Minutes"
+        case byTier = "Tier"
+        case byName = "Name"
+    }
+
+    struct BreakdownRow: Identifiable {
+        let player: Player
+        let projectedMinutes: Int
+        let minimumMinutes: Int
+        let minutesFraction: Double
+        let status: MinutesStatus
+        let assignedPositions: [Position]
+        let conflictNote: String?
+        let goalMinutes: Int
+        let fieldMinutes: Int
+
+        var id: UUID {
+            player.id
+        }
+    }
+
+    struct BreakdownSection: Identifiable {
+        let tier: Tier?
+        let rows: [BreakdownRow]
+        var id: String {
+            tier?.rawValue ?? "all"
+        }
+    }
+
+    var breakdownSort: BreakdownSort = .byMinutes
+    var breakdownGroupByTier: Bool = false
+
+    var breakdownSections: [BreakdownSection] {
+        guard breakdownGroupByTier else { return [BreakdownSection(tier: nil, rows: sortedBreakdownRows)] }
+        return Tier.allCases.compactMap { tier in
+            let rows = sortedBreakdownRows.filter { $0.player.tier == tier }
+            return rows.isEmpty ? nil : BreakdownSection(tier: tier, rows: rows)
+        }
+    }
+
+    private var sortedBreakdownRows: [BreakdownRow] {
+        let rows = presentPlayers.map { makeBreakdownRow(for: $0) }
+        switch breakdownSort {
+        case .byMinutes:
+            return rows.sorted { $0.projectedMinutes > $1.projectedMinutes }
+        case .byTier:
+            let order = Dictionary(uniqueKeysWithValues: Tier.allCases.enumerated().map { ($1, $0) })
+            return rows.sorted { (order[$0.player.tier] ?? 0) < (order[$1.player.tier] ?? 0) }
+        case .byName:
+            return rows.sorted { $0.player.name < $1.player.name }
+        }
+    }
+
+    private func makeBreakdownRow(for player: Player) -> BreakdownRow {
+        let playerID = player.id
+        var goalSlots = 0
+        var fieldSlots = 0
+        var posSet = Set<Position>()
+
+        game.rotationPlan?.slots.forEach { slot in
+            slot.assignments.filter { $0.playerID == playerID }.forEach { pa in
+                posSet.insert(pa.position)
+                if pa.position == .goalie { goalSlots += 1 } else { fieldSlots += 1 }
+            }
+        }
+
+        let positionOrder: [Position] = [.goalie, .attack, .midfield, .defense]
+        let assignedPositions = positionOrder.filter { posSet.contains($0) }
+
+        let attendance = game.attendance.first { $0.id == playerID }
+        var notes: [String] = []
+        if let q = attendance?.lateArrivalQuarter { notes.append("Arrives Q\(q)") }
+        if let q = attendance?.earlyDepartureQuarter { notes.append("Leaves after Q\(q)") }
+
+        return BreakdownRow(
+            player: player,
+            projectedMinutes: projectedMinutes(for: playerID),
+            minimumMinutes: minimumMinutes(for: playerID),
+            minutesFraction: minutesFraction(for: playerID),
+            status: minutesStatus(for: playerID),
+            assignedPositions: assignedPositions,
+            conflictNote: notes.isEmpty ? nil : notes.joined(separator: " · "),
+            goalMinutes: goalSlots * slotDurationMinutes,
+            fieldMinutes: fieldSlots * slotDurationMinutes
+        )
+    }
+
     // MARK: - Summary
 
     var summaryPlayerCount: Int {
@@ -119,7 +225,9 @@ final class RotationOutputViewModel {
         return (minutes.min() ?? 0, minutes.max() ?? 0)
     }
 
-    var summaryViolationCount: Int { activeViolations.count }
+    var summaryViolationCount: Int {
+        activeViolations.count
+    }
 
     var summaryLockedCount: Int {
         game.rotationPlan?.slots.reduce(0) { sum, slot in
@@ -277,6 +385,16 @@ final class RotationOutputViewModel {
         } else {
             expandedBenchSlots.insert(slotIndex)
         }
+    }
+
+    // MARK: - Completion
+
+    func markComplete(stats: GameStats?) {
+        try? store.completeGame(game, stats: stats)
+        if let updated = store.games.first(where: { $0.id == game.id }) {
+            game = updated
+        }
+        gameWasCompleted = true
     }
 
     // MARK: - Regenerate
