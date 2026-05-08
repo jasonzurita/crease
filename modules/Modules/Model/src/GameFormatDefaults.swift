@@ -21,6 +21,15 @@ public struct GameFormatDefaults: Codable, Equatable, Sendable {
         self.hasGoalie = hasGoalie
     }
 
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        quarters = try c.decode(Int.self, forKey: .quarters)
+        quarterLengthMinutes = try c.decode(Int.self, forKey: .quarterLengthMinutes)
+        playersPerSide = try c.decode(Int.self, forKey: .playersPerSide)
+        positionCounts = try c.decodeIfPresent(PositionCounts.self, forKey: .positionCounts)
+        hasGoalie = try c.decodeIfPresent(Bool.self, forKey: .hasGoalie) ?? true
+    }
+
     public static let `default` = GameFormatDefaults(
         quarters: 4,
         quarterLengthMinutes: 10,
