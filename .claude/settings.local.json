@@ -28,7 +28,9 @@
       "Bash(swift test *)",
       "Bash(find ~/Library/Developer/Xcode/DerivedData/crease*/info.plist)",
       "mcp__xcode__XcodeListNavigatorIssues",
-      "Bash(xargs cat *)"
+      "Bash(xargs cat *)",
+      "Bash(xargs ls)",
+      "Bash(grep -E \"\\\\.swift$\")"
     ]
   }
 }

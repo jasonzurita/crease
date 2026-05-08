@@ -6,9 +6,12 @@ public struct PlayerFormView: View {
     @State private var viewModel: PlayerFormViewModel
     @State private var errorMessage: String?
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var focusedField: FocusField?
 
     private let store: SeasonStore
     private let title: String
+
+    private enum FocusField { case name, jerseyNumber }
 
     public init(store: SeasonStore, mode: PlayerFormViewModel.Mode) {
         self.store = store
@@ -60,11 +63,27 @@ public struct PlayerFormView: View {
 
     private var identitySection: some View {
         VStack(spacing: 0) {
-            formRow(label: "Name", text: $viewModel.name, placeholder: "e.g. Alex Johnson")
+            nameRow
             divider
             numberRow
         }
         .crSurfaceCard()
+    }
+
+    private var nameRow: some View {
+        HStack {
+            Text("Name")
+                .foregroundStyle(Color.crTextPrimary)
+            Spacer()
+            TextField("e.g. Alex Johnson", text: $viewModel.name)
+                .multilineTextAlignment(.trailing)
+                .foregroundStyle(Color.crTextPrimary)
+                .tint(Color.crAccent)
+                .focused($focusedField, equals: .name)
+        }
+        .padding()
+        .contentShape(Rectangle())
+        .onTapGesture { focusedField = .name }
     }
 
     private var numberRow: some View {
@@ -78,8 +97,11 @@ public struct PlayerFormView: View {
                 .foregroundStyle(Color.crTextPrimary)
                 .tint(Color.crAccent)
                 .font(.body.monospacedDigit())
+                .focused($focusedField, equals: .jerseyNumber)
         }
         .padding()
+        .contentShape(Rectangle())
+        .onTapGesture { focusedField = .jerseyNumber }
     }
 
     private var positionsSection: some View {
@@ -159,19 +181,6 @@ public struct PlayerFormView: View {
             .fill(Color.white.opacity(0.08))
             .frame(height: 1)
             .padding(.horizontal)
-    }
-
-    private func formRow(label: String, text: Binding<String>, placeholder: String) -> some View {
-        HStack {
-            Text(label)
-                .foregroundStyle(Color.crTextPrimary)
-            Spacer()
-            TextField(placeholder, text: text)
-                .multilineTextAlignment(.trailing)
-                .foregroundStyle(Color.crTextPrimary)
-                .tint(Color.crAccent)
-        }
-        .padding()
     }
 
     private func handleSave() {

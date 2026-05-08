@@ -22,9 +22,22 @@ public struct RosterTabView: View {
                 }
             }
             .navigationTitle("Roster")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.crSurface, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 1) {
+                        Text("Roster")
+                            .font(.headline)
+                            .foregroundStyle(Color.crTextPrimary)
+                        if !store.players.isEmpty {
+                            Text("\(store.players.count) Players")
+                                .font(.caption2)
+                                .foregroundStyle(Color.crTextSecondary)
+                        }
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showingAddPlayer = true

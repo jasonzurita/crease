@@ -3,7 +3,7 @@ import CRModel
 import SwiftUI
 
 struct PlayingTimeBreakdownView: View {
-    @Bindable var viewModel: RotationOutputViewModel
+    let viewModel: RotationOutputViewModel
 
     private var totalMinutes: Int {
         guard let plan = viewModel.plan else { return 1 }
@@ -11,33 +11,7 @@ struct PlayingTimeBreakdownView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            controlBar
-            Divider().background(Color.crTextSecondary.opacity(0.15))
-            content
-        }
-    }
-
-    private var controlBar: some View {
-        HStack(spacing: 12) {
-            Picker("Sort", selection: $viewModel.breakdownSort) {
-                ForEach(RotationOutputViewModel.BreakdownSort.allCases, id: \.self) {
-                    Text($0.rawValue).tag($0)
-                }
-            }
-            .pickerStyle(.segmented)
-
-            Toggle(isOn: $viewModel.breakdownGroupByTier) {
-                Text("By Tier")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(Color.crTextSecondary)
-            }
-            .toggleStyle(.button)
-            .tint(Color.crAccent)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(Color.crSurface)
+        content
     }
 
     @ViewBuilder

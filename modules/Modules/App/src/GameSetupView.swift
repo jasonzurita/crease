@@ -8,6 +8,7 @@ public struct GameSetupView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var errorMessage: String?
     @State private var generatedGame: Game?
+    @State private var isGenerating = false
 
     public init(store: SeasonStore) {
         self.store = store
@@ -29,6 +30,9 @@ public struct GameSetupView: View {
                     navigationButtons
                         .padding()
                 }
+                if isGenerating {
+                    GeneratingPlanOverlay()
+                }
             }
             .navigationTitle(stepTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -45,7 +49,8 @@ public struct GameSetupView: View {
                     game: game,
                     players: store.players,
                     store: store,
-                    showDoneButton: true
+                    showDoneButton: true,
+                    onDone: { dismiss() }
                 )
             }
         }
@@ -130,7 +135,12 @@ public struct GameSetupView: View {
 
             if viewModel.currentStep == .options {
                 Button {
-                    generatePlan()
+                    Task { @MainActor in
+                        isGenerating = true
+                        try? await Task.sleep(for: .seconds(1.4))
+                        generatePlan()
+                        isGenerating = false
+                    }
                 } label: {
                     Text("Generate Plan")
                         .font(.headline)
@@ -140,6 +150,7 @@ public struct GameSetupView: View {
                         .background(Color.crAccent)
                         .clipShape(RoundedRectangle(cornerRadius: 28))
                 }
+                .disabled(isGenerating)
             } else {
                 Button {
                     viewModel.goNext()

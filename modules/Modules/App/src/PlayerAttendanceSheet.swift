@@ -20,7 +20,7 @@ struct PlayerAttendanceSheet: View {
         NavigationStack {
             ZStack {
                 Color.crBackground.ignoresSafeArea()
-                Form {
+                List {
                     Section {
                         Toggle("Present", isOn: Binding(
                             get: { localAttendance.isPresent },
@@ -33,6 +33,9 @@ struct PlayerAttendanceSheet: View {
                                 onUpdate(localAttendance)
                             }
                         ))
+                        .tint(Color.crAccent)
+                        .foregroundStyle(Color.crTextPrimary)
+                        .listRowBackground(Color.crSurface)
                     }
 
                     if localAttendance.isPresent {
@@ -44,6 +47,10 @@ struct PlayerAttendanceSheet: View {
                                     onUpdate(localAttendance)
                                 }
                             ))
+                            .tint(Color.crAccent)
+                            .foregroundStyle(Color.crTextPrimary)
+                            .listRowBackground(Color.crSurface)
+
                             if localAttendance.lateArrivalQuarter != nil {
                                 Picker("Arrives before quarter", selection: Binding(
                                     get: { localAttendance.lateArrivalQuarter ?? 2 },
@@ -52,10 +59,13 @@ struct PlayerAttendanceSheet: View {
                                         onUpdate(localAttendance)
                                     }
                                 )) {
-                                    ForEach(1...max(1, quarters), id: \.self) { q in
+                                    ForEach(1 ... max(1, quarters), id: \.self) { q in
                                         Text("Q\(q)").tag(q)
                                     }
                                 }
+                                .tint(Color.crAccent)
+                                .foregroundStyle(Color.crTextPrimary)
+                                .listRowBackground(Color.crSurface)
                             }
 
                             Toggle("Early Departure", isOn: Binding(
@@ -65,6 +75,10 @@ struct PlayerAttendanceSheet: View {
                                     onUpdate(localAttendance)
                                 }
                             ))
+                            .tint(Color.crAccent)
+                            .foregroundStyle(Color.crTextPrimary)
+                            .listRowBackground(Color.crSurface)
+
                             if localAttendance.earlyDepartureQuarter != nil {
                                 Picker("Leaves after quarter", selection: Binding(
                                     get: { localAttendance.earlyDepartureQuarter ?? max(1, quarters - 1) },
@@ -73,14 +87,18 @@ struct PlayerAttendanceSheet: View {
                                         onUpdate(localAttendance)
                                     }
                                 )) {
-                                    ForEach(1...max(1, quarters), id: \.self) { q in
+                                    ForEach(1 ... max(1, quarters), id: \.self) { q in
                                         Text("Q\(q)").tag(q)
                                     }
                                 }
+                                .tint(Color.crAccent)
+                                .foregroundStyle(Color.crTextPrimary)
+                                .listRowBackground(Color.crSurface)
                             }
                         }
                     }
                 }
+                .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
             }
             .navigationTitle(playerName)

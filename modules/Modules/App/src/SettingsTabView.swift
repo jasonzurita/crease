@@ -4,10 +4,6 @@ import SwiftUI
 
 public struct SettingsTabView: View {
     @Environment(SeasonStore.self) private var store
-    @AppStorage("cr_color_scheme") private var colorSchemePreference = "system"
-    @State private var showingExportError: String?
-    @State private var exportURL: URL?
-    @State private var isExporting = false
     @State private var confirmDeleteShowing = false
     @State private var finalDeleteShowing = false
 
@@ -21,7 +17,6 @@ public struct SettingsTabView: View {
                     activeSeasonSection
                     seasonsSection
                     dataSection
-                    appearanceSection
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
@@ -29,19 +24,6 @@ public struct SettingsTabView: View {
             .navigationTitle("Settings")
             .toolbarBackground(Color.crSurface, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
-        }
-        .sheet(isPresented: $isExporting) {
-            if let url = exportURL {
-                ActivityView(items: [url])
-            }
-        }
-        .alert("Export Failed", isPresented: Binding(
-            get: { showingExportError != nil },
-            set: { if !$0 { showingExportError = nil } }
-        )) {
-            Button("OK") { showingExportError = nil }
-        } message: {
-            Text(showingExportError ?? "")
         }
         .alert("Delete Active Season?", isPresented: $confirmDeleteShowing) {
             Button("Continue", role: .destructive) { finalDeleteShowing = true }
@@ -103,16 +85,6 @@ public struct SettingsTabView: View {
 
     private var dataSection: some View {
         Section("Data") {
-            Button {
-                exportSeason()
-            } label: {
-                Label("Export Season", systemImage: "square.and.arrow.up")
-                    .foregroundStyle(Color.crAccent)
-            }
-            .listRowBackground(Color.crSurface)
-            .disabled(store.activeSeason == nil)
-            .accessibilityLabel("Export active season as a zip file")
-
             Button(role: .destructive) {
                 confirmDeleteShowing = true
             } label: {
@@ -125,30 +97,7 @@ public struct SettingsTabView: View {
         }
     }
 
-    private var appearanceSection: some View {
-        Section("Appearance") {
-            Picker("Color Scheme", selection: $colorSchemePreference) {
-                Text("System").tag("system")
-                Text("Light").tag("light")
-                Text("Dark").tag("dark")
-            }
-            .foregroundStyle(Color.crTextPrimary)
-            .tint(Color.crAccent)
-            .listRowBackground(Color.crSurface)
-        }
-    }
-
     // MARK: - Actions
-
-    private func exportSeason() {
-        guard let season = store.activeSeason else { return }
-        do {
-            exportURL = try store.exportSeasonZip(season)
-            isExporting = true
-        } catch {
-            showingExportError = error.localizedDescription
-        }
-    }
 
     private func deleteActiveSeason() {
         guard let season = store.activeSeason else { return }

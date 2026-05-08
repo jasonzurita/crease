@@ -97,7 +97,8 @@ struct LineupCardOptionsSheet: View {
         )
         let renderer = ImageRenderer(content: card)
         renderer.scale = 3.0
-        shareImage = renderer.uiImage
+        guard let image = renderer.uiImage else { return }
+        shareImage = image
         isSharing = true
     }
 }

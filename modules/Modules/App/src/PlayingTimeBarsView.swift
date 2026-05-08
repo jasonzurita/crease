@@ -7,12 +7,29 @@ struct PlayingTimeBarsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Playing Time")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.crTextSecondary)
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
+            HStack {
+                Text("Playing Time")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.crTextSecondary)
+                Text("· by tier minimum")
+                    .font(.caption)
+                    .foregroundStyle(Color.crTextSecondary.opacity(0.6))
+                Spacer()
+                Button {
+                    viewModel.openFairnessEditor()
+                } label: {
+                    Label("Edit Targets", systemImage: "slider.horizontal.3")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Color.crAccent)
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 10)
+                        .background(Color.crAccent.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
 
             VStack(spacing: 6) {
                 ForEach(viewModel.presentPlayers, id: \.id) { player in
