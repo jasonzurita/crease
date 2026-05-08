@@ -74,7 +74,7 @@ public struct RotationOutputView: View {
         }
         .fullScreenCover(isPresented: $viewModel.showLiveMode) {
             LiveGameView(game: viewModel.game, players: viewModel.players) { stats in
-                viewModel.saveLiveStats(stats)
+                viewModel.markComplete(stats: stats)
             }
         }
         .onChange(of: viewModel.gameWasCompleted) { _, completed in

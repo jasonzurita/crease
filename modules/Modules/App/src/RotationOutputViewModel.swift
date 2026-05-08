@@ -258,10 +258,9 @@ final class RotationOutputViewModel {
         swapSourcePlayerID = playerID
     }
 
-    func hasBenchCandidates(slotIndex: Int, position: Position) -> Bool {
+    func hasBenchCandidates(slotIndex: Int, position _: Position) -> Bool {
         guard let plan = game.rotationPlan, slotIndex < plan.slots.count else { return false }
-        let slot = plan.slots[slotIndex]
-        return players.contains { slot.bench.contains($0.id) && $0.positions.contains(position) }
+        return !plan.slots[slotIndex].bench.isEmpty
     }
 
     func removePlayerDirect(slotIndex: Int, position: Position, playerID: UUID) {
@@ -304,9 +303,7 @@ final class RotationOutputViewModel {
     func initiateBenchSwap(slotIndex: Int, position: Position) {
         guard let plan = game.rotationPlan, slotIndex < plan.slots.count else { return }
         let slot = plan.slots[slotIndex]
-        benchSwapCandidates = players.filter { player in
-            slot.bench.contains(player.id) && player.positions.contains(position)
-        }
+        benchSwapCandidates = players.filter { slot.bench.contains($0.id) }
         guard !benchSwapCandidates.isEmpty else { return }
         benchSwapTarget = CellID(slotIndex: slotIndex, position: position)
         showBenchSwapSheet = true
@@ -448,6 +445,11 @@ final class RotationOutputViewModel {
         isRegenerating = true
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1.2))
+            if let seasonFormat = store.activeSeason?.gameFormatDefaults {
+                var refreshed = game
+                refreshed.format = seasonFormat
+                game = refreshed
+            }
             try? store.generatePlan(for: game)
             if let updated = store.games.first(where: { $0.id == game.id }) {
                 game = updated
@@ -500,19 +502,20 @@ final class RotationOutputViewModel {
     // MARK: - Position counts
 
     func openPositionCountsEditor() {
-        editedPositionCounts = game.format.positionCounts ?? game.format.effectivePositionCounts
-        editedHasGoalie = game.format.hasGoalie
+        let format = store.activeSeason?.gameFormatDefaults ?? game.format
+        editedPositionCounts = format.positionCounts ?? format.effectivePositionCounts
+        editedHasGoalie = format.hasGoalie
         showPositionCountsEditor = true
     }
 
     func savePositionCounts() {
         guard let counts = editedPositionCounts else { return }
-        var updated = game
-        updated.format.positionCounts = counts
-        updated.format.hasGoalie = editedHasGoalie
-        updated.format.playersPerSide = updated.format.derivedPlayersPerSide
-        game = updated
-        try? store.updateGame(updated)
+        if var season = store.activeSeason {
+            season.gameFormatDefaults.positionCounts = counts
+            season.gameFormatDefaults.hasGoalie = editedHasGoalie
+            season.gameFormatDefaults.playersPerSide = season.gameFormatDefaults.derivedPlayersPerSide
+            try? store.updateSeason(season)
+        }
         showPositionCountsEditor = false
         doRegenerate()
     }
