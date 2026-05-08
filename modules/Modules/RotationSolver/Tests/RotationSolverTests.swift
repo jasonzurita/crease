@@ -451,6 +451,132 @@ struct RotationSolverTests {
         #expect(stillLocked == true)
     }
 
+    // MARK: - hasGoalie = false
+
+    @Test func noGoalieFormatProducesNoGoalieAssignments() {
+        let players = (0 ..< 6).map { i in makePlayer(number: i, positions: [.attack, .midfield, .defense]) }
+        let game = makeGame(
+            players: players,
+            format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 6, hasGoalie: false)
+        )
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        for slot in plan.slots {
+            #expect(slot.assignments.allSatisfy { $0.position != .goalie })
+        }
+        let goalieViolations = plan.violations.filter { $0.kind == .noEligiblePlayer && $0.position == .goalie }
+        #expect(goalieViolations.isEmpty)
+    }
+
+    @Test func noGoalieFormatFillsAllFieldSlots() {
+        // 6 players, 6v6 no-goalie → attack=2, midfield=2, defense=2; all 6 fill, bench empty
+        let players = (0 ..< 6).map { i in makePlayer(number: i, positions: [.attack, .midfield, .defense]) }
+        let game = makeGame(
+            players: players,
+            format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 6, hasGoalie: false)
+        )
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        for slot in plan.slots {
+            #expect(slot.assignments.count == 6)
+            #expect(slot.bench.isEmpty)
+        }
+        #expect(plan.violations.filter { $0.kind == .noEligiblePlayer }.isEmpty)
+    }
+
+    // MARK: - Edge cases
+
+    @Test func playerWithNoAttendanceRecordIsNotAssigned() {
+        let ghost = makePlayer(positions: [.attack, .midfield, .defense, .goalie])
+        let others = allPositionPlayers(count: 7)
+        let players = [ghost] + others
+        let att = attendAll(others) // ghost has no attendance entry
+        let game = makeGame(players: players, attendance: att)
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        for slot in plan.slots {
+            let allIDs = slot.assignments.map { $0.playerID } + slot.bench
+            #expect(!allIDs.contains(ghost.id))
+        }
+    }
+
+    @Test func singlePresentPlayerIsAssignedOncePerSlot() {
+        let player = makePlayer(positions: [.attack, .midfield, .defense, .goalie])
+        let game = makeGame(players: [player])
+        let plan = RotationSolver.solve(game: game, players: [player])
+
+        for slot in plan.slots {
+            let assignedCount = slot.assignments.filter { $0.playerID == player.id }.count
+            #expect(assignedCount == 1)
+            #expect(!slot.bench.contains(player.id))
+        }
+    }
+
+    @Test func lateArrivalPlayerFillsAllAvailableSlots() {
+        // 8 players, 7v7, 4 quarters. Late player arrives Q3 (available for 2 of 4 slots).
+        // Play ratio normalisation means they have priority in both Q3 and Q4.
+        let latePlayer = makePlayer(positions: [.attack, .midfield, .defense, .goalie])
+        let others = allPositionPlayers(count: 7)
+        let players = [latePlayer] + others
+        var att = attendAll(players)
+        att[0] = PlayerAttendance(id: latePlayer.id, isPresent: true, lateArrivalQuarter: 3, earlyDepartureQuarter: nil)
+        let game = makeGame(players: players, attendance: att)
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        let latePlayed = plan.slots.filter { slot in
+            slot.assignments.contains { $0.playerID == latePlayer.id }
+        }.count
+        #expect(latePlayed == 2)
+    }
+
+    @Test func byTimeIntervalNonDivisibleIntervalUsesFloorDivision() {
+        // 10-minute quarter with 3-minute interval → floor(10/3) = 3 rotations
+        let players = allPositionPlayers(count: 7)
+        let game = makeGame(
+            players: players,
+            format: GameFormatDefaults(quarters: 1, quarterLengthMinutes: 10, playersPerSide: 7),
+            rotationStyle: .byTimeInterval(intervalMinutes: 3)
+        )
+        let plan = RotationSolver.solve(game: game, players: players)
+        #expect(plan.slots.count == 3)
+    }
+
+    @Test func allTiersMeetMinimumMinutesWithAdequateRoster() {
+        // One player per tier, 5v5 no-goalie, 4 quarters × 10 min = 40 min each.
+        // All minimums ≤ 40, so no minutesBelowMinimum violations.
+        let tiers: [Tier] = [.elite, .strong, .developing, .learning, .beginner]
+        let players = tiers.enumerated().map { i, tier in
+            makePlayer(number: i, positions: [.attack, .midfield, .defense], tier: tier)
+        }
+        let game = makeGame(
+            players: players,
+            format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 5, hasGoalie: false)
+        )
+        let plan = RotationSolver.solve(game: game, players: players)
+        #expect(plan.violations.filter { $0.kind == .minutesBelowMinimum }.isEmpty)
+    }
+
+    @Test func balancedModePrefersTierAsPlayRatioTiebreaker() throws {
+        // 8 players (4 beginners first, 4 elites) for 7 slots over 4 quarters.
+        // Balanced mode uses tier as a tiebreaker when play ratios are equal.
+        // Elites should accumulate more plays (4 each) than beginners (3 each).
+        let beginners = (0 ..< 4).map { i in makePlayer(number: i, positions: [.attack, .midfield, .defense, .goalie], tier: .beginner) }
+        let elites = (4 ..< 8).map { i in makePlayer(number: i, positions: [.attack, .midfield, .defense, .goalie], tier: .elite) }
+        let players = beginners + elites // beginners listed first to confirm tier beats input order
+        let game = makeGame(players: players, mode: .balanced)
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        var playCount: [UUID: Int] = [:]
+        for slot in plan.slots {
+            for assignment in slot.assignments {
+                playCount[assignment.playerID, default: 0] += 1
+            }
+        }
+        let elitePlays = elites.map { playCount[$0.id] ?? 0 }
+        let beginnerPlays = beginners.map { playCount[$0.id] ?? 0 }
+        #expect(try #require(elitePlays.min()) >= beginnerPlays.max()!)
+    }
+
     @Test func lockedAbsentPlayerIsNotPreserved() {
         let players = allPositionPlayers(count: 7)
         var game = makeGame(players: players)

@@ -13,7 +13,7 @@ public struct RotationSolver: Sendable {
         let duration = rotationDuration(format: game.format, rotationStyle: game.rotationStyle)
         let counts = game.format.effectivePositionCounts
         let slotCounts: [Position: Int] = [
-            .goalie: 1,
+            .goalie: game.format.hasGoalie ? 1 : 0,
             .attack: counts.attack,
             .midfield: counts.midfield,
             .defense: counts.defense,
