@@ -11,7 +11,13 @@ public struct RotationSolver: Sendable {
 
         let schedule = makeSchedule(format: game.format, rotationStyle: game.rotationStyle)
         let duration = rotationDuration(format: game.format, rotationStyle: game.rotationStyle)
-        let slotCounts = makeSlotCounts(playersPerSide: game.format.playersPerSide)
+        let counts = game.format.effectivePositionCounts
+        let slotCounts: [Position: Int] = [
+            .goalie: 1,
+            .attack: counts.attack,
+            .midfield: counts.midfield,
+            .defense: counts.defense,
+        ]
         let boostedIDs = Set(game.boostedPlayerIDs)
 
         let presentPlayers = players.filter { player in
@@ -79,7 +85,7 @@ public struct RotationSolver: Sendable {
                 )
 
                 let toAssign = min(needed, sorted.count)
-                for i in 0..<toAssign {
+                for i in 0 ..< toAssign {
                     let player = sorted[i]
                     assignedIDs.insert(player.id)
                     assignments.append(
@@ -87,7 +93,7 @@ public struct RotationSolver: Sendable {
                     )
                 }
 
-                for _ in toAssign..<needed {
+                for _ in toAssign ..< needed {
                     violations.append(.noEligiblePlayer(position: position, quarter: quarter, subIndex: subIndex))
                 }
             }
@@ -139,11 +145,11 @@ public struct RotationSolver: Sendable {
     ) -> [(quarter: Int, subIndex: Int)] {
         switch rotationStyle {
         case .byQuarter:
-            return (1...format.quarters).map { ($0, 0) }
-        case .byTimeInterval(let interval):
+            return (1 ... format.quarters).map { ($0, 0) }
+        case let .byTimeInterval(interval):
             let subsPerQuarter = max(1, format.quarterLengthMinutes / interval)
-            return (1...format.quarters).flatMap { q in
-                (0..<subsPerQuarter).map { s in (q, s) }
+            return (1 ... format.quarters).flatMap { q in
+                (0 ..< subsPerQuarter).map { s in (q, s) }
             }
         }
     }
@@ -151,20 +157,8 @@ public struct RotationSolver: Sendable {
     private static func rotationDuration(format: GameFormatDefaults, rotationStyle: RotationStyle) -> Int {
         switch rotationStyle {
         case .byQuarter: return format.quarterLengthMinutes
-        case .byTimeInterval(let interval): return interval
+        case let .byTimeInterval(interval): return interval
         }
-    }
-
-    private static func makeSlotCounts(playersPerSide: Int) -> [Position: Int] {
-        let fieldPlayers = max(0, playersPerSide - 1)
-        let base = fieldPlayers / 3
-        let remainder = fieldPlayers % 3
-        return [
-            .goalie: 1,
-            .attack: base + (remainder > 0 ? 1 : 0),
-            .midfield: base + (remainder > 1 ? 1 : 0),
-            .defense: base,
-        ]
     }
 
     private static func computeAvailableSlotCounts(
@@ -202,7 +196,7 @@ public struct RotationSolver: Sendable {
             let bBoosted = boostedIDs.contains(b.id)
             if aBoosted != bBoosted { return aBoosted }
 
-            if isKeySlot && mode == .competitive {
+            if isKeySlot, mode == .competitive {
                 let at = tierStrength(a.tier)
                 let bt = tierStrength(b.tier)
                 if at != bt { return at > bt }
@@ -219,7 +213,7 @@ public struct RotationSolver: Sendable {
                 availableSlotCounts: availableSlotCounts
             )
 
-            if abs(ar - br) < 0.001 && (mode == .balanced || mode == .competitive) {
+            if abs(ar - br) < 0.001, mode == .balanced || mode == .competitive {
                 let at = tierStrength(a.tier)
                 let bt = tierStrength(b.tier)
                 if at != bt { return at > bt }

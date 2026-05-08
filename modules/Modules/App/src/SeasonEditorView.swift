@@ -7,6 +7,9 @@ struct SeasonEditorView: View {
     @Environment(\.dismiss) private var dismiss
     private let store: SeasonStore
     @State private var errorMessage: String?
+    @FocusState private var focusedField: FocusField?
+
+    private enum FocusField { case teamName, seasonName }
 
     init(season: Season, store: SeasonStore) {
         _viewModel = State(initialValue: SeasonEditorViewModel(season: season))
@@ -48,9 +51,9 @@ struct SeasonEditorView: View {
 
     private var teamInfoSection: some View {
         VStack(spacing: 0) {
-            formRow(label: "Team Name", text: $viewModel.teamName, placeholder: "e.g. Eagles")
+            formRow(label: "Team Name", text: $viewModel.teamName, placeholder: "e.g. Eagles", field: .teamName)
             divider
-            formRow(label: "Season", text: $viewModel.seasonName, placeholder: "e.g. Spring 2025")
+            formRow(label: "Season", text: $viewModel.seasonName, placeholder: "e.g. Spring 2025", field: .seasonName)
         }
         .crSurfaceCard()
     }
@@ -67,9 +70,65 @@ struct SeasonEditorView: View {
                 stepperRow(label: "Quarter Length", value: $viewModel.gameFormatDefaults.quarterLengthMinutes, range: 5 ... 20, unit: "min")
                 divider
                 stepperRow(label: "Players Per Side", value: $viewModel.gameFormatDefaults.playersPerSide, range: 5 ... 11, unit: nil)
+                divider
+                stepperRow(label: "Attack", value: attackCountBinding, range: 0 ... 10, unit: nil)
+                divider
+                stepperRow(label: "Midfield", value: midfieldCountBinding, range: 0 ... 10, unit: nil)
+                divider
+                stepperRow(label: "Defense", value: defenseCountBinding, range: 0 ... 10, unit: nil)
+                divider
+                positionTotalRow
             }
             .crSurfaceCard()
         }
+    }
+
+    private var positionTotalRow: some View {
+        let counts = viewModel.gameFormatDefaults.effectivePositionCounts
+        let total = counts.fieldTotal + 1
+        let isValid = total == viewModel.gameFormatDefaults.playersPerSide
+        return HStack {
+            Text("Total on field")
+                .foregroundStyle(Color.crTextSecondary)
+            Spacer()
+            Text("\(total) of \(viewModel.gameFormatDefaults.playersPerSide)")
+                .font(.subheadline.monospacedDigit().weight(.semibold))
+                .foregroundStyle(isValid ? Color.crSuccess : Color.crDanger)
+        }
+        .padding()
+    }
+
+    private var attackCountBinding: Binding<Int> {
+        Binding(
+            get: { viewModel.gameFormatDefaults.effectivePositionCounts.attack },
+            set: {
+                var counts = viewModel.gameFormatDefaults.positionCounts ?? viewModel.gameFormatDefaults.effectivePositionCounts
+                counts.attack = $0
+                viewModel.gameFormatDefaults.positionCounts = counts
+            }
+        )
+    }
+
+    private var midfieldCountBinding: Binding<Int> {
+        Binding(
+            get: { viewModel.gameFormatDefaults.effectivePositionCounts.midfield },
+            set: {
+                var counts = viewModel.gameFormatDefaults.positionCounts ?? viewModel.gameFormatDefaults.effectivePositionCounts
+                counts.midfield = $0
+                viewModel.gameFormatDefaults.positionCounts = counts
+            }
+        )
+    }
+
+    private var defenseCountBinding: Binding<Int> {
+        Binding(
+            get: { viewModel.gameFormatDefaults.effectivePositionCounts.defense },
+            set: {
+                var counts = viewModel.gameFormatDefaults.positionCounts ?? viewModel.gameFormatDefaults.effectivePositionCounts
+                counts.defense = $0
+                viewModel.gameFormatDefaults.positionCounts = counts
+            }
+        )
     }
 
     private func save() {
@@ -88,7 +147,7 @@ struct SeasonEditorView: View {
             .padding(.horizontal)
     }
 
-    private func formRow(label: String, text: Binding<String>, placeholder: String) -> some View {
+    private func formRow(label: String, text: Binding<String>, placeholder: String, field: FocusField) -> some View {
         HStack {
             Text(label).foregroundStyle(Color.crTextPrimary)
             Spacer()
@@ -96,8 +155,11 @@ struct SeasonEditorView: View {
                 .multilineTextAlignment(.trailing)
                 .foregroundStyle(Color.crTextPrimary)
                 .tint(Color.crAccent)
+                .focused($focusedField, equals: field)
         }
         .padding()
+        .contentShape(Rectangle())
+        .onTapGesture { focusedField = field }
     }
 
     private func stepperRow(label: String, value: Binding<Int>, range: ClosedRange<Int>, unit: String?) -> some View {

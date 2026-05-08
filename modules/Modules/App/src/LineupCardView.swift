@@ -16,6 +16,7 @@ struct LineupCardView: View {
     private static let cardWidth: CGFloat = 390
     private static let labelWidth: CGFloat = 52
     private static let ptBarWidth: CGFloat = 210
+    private static let rowHeight: CGFloat = 30
 
     var body: some View {
         VStack(spacing: 0) {
@@ -94,7 +95,7 @@ struct LineupCardView: View {
 
     private func headerRow(plan: RotationPlan, colW: CGFloat) -> some View {
         HStack(spacing: 0) {
-            Color.clear.frame(width: Self.labelWidth, height: 26)
+            Color.clear.frame(width: Self.labelWidth, height: 24)
                 .overlay(alignment: .trailing) {
                     Rectangle().fill(Color.crTextSecondary.opacity(0.2)).frame(width: 1)
                 }
@@ -102,7 +103,7 @@ struct LineupCardView: View {
                 Text(slotLabel(slot))
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(Color.crTextPrimary)
-                    .frame(width: colW, height: 26)
+                    .frame(width: colW, height: 24)
                     .background(i.isMultiple(of: 2) ? Color.crSurface : Color.crBackground)
                     .overlay(alignment: .trailing) {
                         Rectangle().fill(Color.crTextSecondary.opacity(0.1)).frame(width: 1)
@@ -112,30 +113,42 @@ struct LineupCardView: View {
     }
 
     private func positionRow(position: Position, plan: RotationPlan, colW: CGFloat) -> some View {
-        HStack(spacing: 0) {
+        let maxCount = max(1, plan.slots.map { $0.assignments.filter { $0.position == position }.count }.max() ?? 1)
+
+        return HStack(spacing: 0) {
             Text(Self.posLabel[position] ?? "")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(Color.crTextSecondary)
-                .frame(width: Self.labelWidth, height: 34, alignment: .leading)
+                .frame(width: Self.labelWidth, height: Self.rowHeight * CGFloat(maxCount), alignment: .topLeading)
                 .padding(.leading, 10)
+                .padding(.top, 6)
                 .overlay(alignment: .trailing) {
                     Rectangle().fill(Color.crTextSecondary.opacity(0.2)).frame(width: 1)
                 }
             ForEach(Array(plan.slots.enumerated()), id: \.offset) { i, slot in
-                let name = slot.assignments
-                    .first { $0.position == position }
-                    .flatMap { pa in players.first { $0.id == pa.playerID } }
-                    .map { shortName($0.name) } ?? "—"
-                Text(name)
-                    .font(.caption2)
-                    .foregroundStyle(name == "—" ? Color.crTextSecondary.opacity(0.35) : Color.crTextPrimary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .frame(width: colW, height: 34)
-                    .background(i.isMultiple(of: 2) ? Color.crSurface.opacity(0.4) : Color.clear)
-                    .overlay(alignment: .trailing) {
-                        Rectangle().fill(Color.crTextSecondary.opacity(0.1)).frame(width: 1)
+                let assignments = slot.assignments.filter { $0.position == position }
+                VStack(spacing: 0) {
+                    ForEach(0 ..< maxCount, id: \.self) { playerIdx in
+                        if playerIdx < assignments.count {
+                            let pa = assignments[playerIdx]
+                            let name = players.first { $0.id == pa.playerID }.map { shortName($0.name) } ?? "—"
+                            Text(name)
+                                .font(.caption2)
+                                .foregroundStyle(name == "—" ? Color.crTextSecondary.opacity(0.35) : Color.crTextPrimary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                .frame(width: colW, height: Self.rowHeight, alignment: .center)
+                                .background(i.isMultiple(of: 2) ? Color.crSurface.opacity(0.4) : Color.clear)
+                        } else {
+                            Color.clear
+                                .frame(width: colW, height: Self.rowHeight)
+                                .background(i.isMultiple(of: 2) ? Color.crSurface.opacity(0.4) : Color.clear)
+                        }
                     }
+                }
+                .overlay(alignment: .trailing) {
+                    Rectangle().fill(Color.crTextSecondary.opacity(0.1)).frame(width: 1)
+                }
             }
         }
     }

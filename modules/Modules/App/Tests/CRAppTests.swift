@@ -556,27 +556,42 @@ struct RotationOutputViewModelTests {
 
     // MARK: - Tap-to-swap
 
-    @Test func tapCellSelectsIt() throws {
+    @Test func tapCellShowsActionMenu() throws {
         let store = try makeStore()
         let players = makePlayers()
         let plan = makePlan(players: players)
         let game = makeGame(players: players, plan: plan)
         let vm = try makeVM(store: store, game: game, players: players)
 
-        vm.tapCell(slotIndex: 0, position: .goalie)
-        #expect(vm.selectedCell == RotationOutputViewModel.CellID(slotIndex: 0, position: .goalie))
+        vm.tapCell(slotIndex: 0, position: .goalie, playerID: players[0].id)
+        #expect(vm.cellActionMenuTarget == RotationOutputViewModel.CellID(slotIndex: 0, position: .goalie))
+        #expect(vm.swapSourceCell == nil)
     }
 
-    @Test func tapSameCellTwiceDeselectsIt() throws {
+    @Test func initiateSwapModeEntersSwapState() throws {
         let store = try makeStore()
         let players = makePlayers()
         let plan = makePlan(players: players)
         let game = makeGame(players: players, plan: plan)
         let vm = try makeVM(store: store, game: game, players: players)
 
-        vm.tapCell(slotIndex: 0, position: .goalie)
-        vm.tapCell(slotIndex: 0, position: .goalie)
-        #expect(vm.selectedCell == nil)
+        vm.tapCell(slotIndex: 0, position: .goalie, playerID: players[0].id)
+        vm.initiateSwapMode()
+        #expect(vm.swapSourceCell == RotationOutputViewModel.CellID(slotIndex: 0, position: .goalie))
+        #expect(vm.cellActionMenuTarget == nil)
+    }
+
+    @Test func cancelSwapClearsSwapSource() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players)
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        vm.tapCell(slotIndex: 0, position: .goalie, playerID: players[0].id)
+        vm.initiateSwapMode()
+        vm.cancelSwap()
+        #expect(vm.swapSourceCell == nil)
     }
 
     @Test func tapTwoDifferentCellsSwapsPlayers() throws {
@@ -589,15 +604,16 @@ struct RotationOutputViewModelTests {
         let goalieID = players[0].id
         let attackID = players[1].id
 
-        vm.tapCell(slotIndex: 0, position: .goalie)
-        vm.tapCell(slotIndex: 0, position: .attack)
+        vm.tapCell(slotIndex: 0, position: .goalie, playerID: players[0].id)
+        vm.initiateSwapMode()
+        vm.tapCell(slotIndex: 0, position: .attack, playerID: players[1].id)
 
         let newGoalieID = vm.plan?.slots[0].assignments.first { $0.position == .goalie }?.playerID
         let newAttackID = vm.plan?.slots[0].assignments.first { $0.position == .attack }?.playerID
 
         #expect(newGoalieID == attackID)
         #expect(newAttackID == goalieID)
-        #expect(vm.selectedCell == nil)
+        #expect(vm.swapSourceCell == nil)
     }
 
     @Test func swapSetsCanUndo() throws {
@@ -607,8 +623,9 @@ struct RotationOutputViewModelTests {
         let game = makeGame(players: players, plan: plan)
         let vm = try makeVM(store: store, game: game, players: players)
 
-        vm.tapCell(slotIndex: 0, position: .goalie)
-        vm.tapCell(slotIndex: 0, position: .attack)
+        vm.tapCell(slotIndex: 0, position: .goalie, playerID: players[0].id)
+        vm.initiateSwapMode()
+        vm.tapCell(slotIndex: 0, position: .attack, playerID: players[1].id)
 
         #expect(vm.canUndo == true)
         #expect(vm.hasManualChanges == true)
@@ -623,8 +640,9 @@ struct RotationOutputViewModelTests {
 
         let originalGoalieID = players[0].id
 
-        vm.tapCell(slotIndex: 0, position: .goalie)
-        vm.tapCell(slotIndex: 0, position: .attack)
+        vm.tapCell(slotIndex: 0, position: .goalie, playerID: players[0].id)
+        vm.initiateSwapMode()
+        vm.tapCell(slotIndex: 0, position: .attack, playerID: players[1].id)
         vm.undo()
 
         let restoredGoalieID = vm.plan?.slots[0].assignments.first { $0.position == .goalie }?.playerID
@@ -722,5 +740,78 @@ struct RotationOutputViewModelTests {
         #expect(vm.activeViolations.count == 1)
         vm.dismissViolation(at: 0)
         #expect(vm.activeViolations.isEmpty)
+    }
+
+    // MARK: - Undo clears hasManualChanges
+
+    @Test func undoResetsHasManualChanges() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players)
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        vm.tapCell(slotIndex: 0, position: .goalie, playerID: players[0].id)
+        vm.initiateSwapMode()
+        vm.tapCell(slotIndex: 0, position: .attack, playerID: players[1].id)
+        #expect(vm.hasManualChanges == true)
+        #expect(vm.canUndo == true)
+
+        vm.undo()
+        #expect(vm.hasManualChanges == false)
+        #expect(vm.canUndo == false)
+    }
+
+    // MARK: - Fairness targets update violations
+
+    @Test func saveFairnessTargetsClearsStaleMinutesViolations() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        var plan = makePlan(players: players)
+        // Player 4 is benched — inject a minutesBelowMinimum violation for them
+        plan.violations = [Violation.minutesBelowMinimum(playerID: players[4].id, projectedMinutes: 0, minimumMinutes: 6)]
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        #expect(vm.activeViolations.count == 1)
+
+        // Lower the minimum to 0 so benched player is no longer in violation
+        vm.openFairnessEditor()
+        vm.editedFairnessTargets = FairnessTargets(
+            eliteMinutes: 0,
+            strongMinutes: 0,
+            developingMinutes: 0,
+            learningMinutes: 0,
+            beginnerMinutes: 0,
+            goalieTimeCountsAsFieldTime: true
+        )
+        vm.saveFairnessTargets()
+
+        #expect(vm.activeViolations.isEmpty)
+    }
+
+    @Test func saveFairnessTargetsAddsNewMinutesViolationsWhenTargetsRise() throws {
+        let store = try makeStore()
+        let players = makePlayers()
+        let plan = makePlan(players: players) // no violations
+        let game = makeGame(players: players, plan: plan)
+        let vm = try makeVM(store: store, game: game, players: players)
+
+        #expect(vm.activeViolations.isEmpty)
+
+        // Raise minimum so that every player needs more than 10 min → benched players violate
+        vm.openFairnessEditor()
+        vm.editedFairnessTargets = FairnessTargets(
+            eliteMinutes: 99,
+            strongMinutes: 99,
+            developingMinutes: 99,
+            learningMinutes: 99,
+            beginnerMinutes: 99,
+            goalieTimeCountsAsFieldTime: true
+        )
+        vm.saveFairnessTargets()
+
+        // All 6 players need 99 min but only get at most 10 → all should violate
+        #expect(vm.activeViolations.filter { $0.kind == .minutesBelowMinimum }.count == 6)
     }
 }
