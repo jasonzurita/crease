@@ -88,18 +88,20 @@ struct LineupCardOptionsSheet: View {
     }
 
     private func generateAndShare() {
-        let card = LineupCardView(
-            game: viewModel.game,
-            players: viewModel.players,
-            teamName: viewModel.teamName,
-            includesPlayingTime: viewModel.lineupCardIncludesPlayingTime,
-            slotDurationMinutes: viewModel.slotDurationMinutes
-        )
-        let renderer = ImageRenderer(content: card)
-        renderer.scale = 3.0
-        guard let image = renderer.uiImage else { return }
-        shareImage = image
-        isSharing = true
+        Task { @MainActor in
+            let card = LineupCardView(
+                game: viewModel.game,
+                players: viewModel.players,
+                teamName: viewModel.teamName,
+                includesPlayingTime: viewModel.lineupCardIncludesPlayingTime,
+                slotDurationMinutes: viewModel.slotDurationMinutes
+            )
+            let renderer = ImageRenderer(content: card)
+            renderer.scale = 3.0
+            guard let image = renderer.uiImage else { return }
+            shareImage = image
+            isSharing = true
+        }
     }
 }
 
