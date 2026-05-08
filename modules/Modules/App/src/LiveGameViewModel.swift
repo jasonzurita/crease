@@ -60,6 +60,10 @@ final class LiveGameViewModel {
         currentSlotIndex >= totalSlots - 1
     }
 
+    var currentQuarter: Int {
+        currentSlot?.quarter ?? (currentSlotIndex + 1)
+    }
+
     var presentPlayers: [Player] {
         let presentIDs = Set(game.attendance.filter { $0.isPresent }.map { $0.id })
         return players.filter { presentIDs.contains($0.id) }.sorted { $0.name < $1.name }

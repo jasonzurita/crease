@@ -4,14 +4,20 @@ import SwiftUI
 
 struct LiveGameView: View {
     @State private var viewModel: LiveGameViewModel
-    let onSaveStats: (GameStats) -> Void
+    let onEndGame: (GameStats) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var showDoneConfirmation = false
 
     private static let orderedPositions: [Position] = [.goalie, .attack, .midfield, .defense]
 
-    init(game: Game, players: [Player], onSaveStats: @escaping (GameStats) -> Void) {
+    init(game: Game, players: [Player], onEndGame: @escaping (GameStats) -> Void) {
         _viewModel = State(initialValue: LiveGameViewModel(game: game, players: players))
-        self.onSaveStats = onSaveStats
+        self.onEndGame = onEndGame
+    }
+
+    private var isQuarterRotation: Bool {
+        if case .byQuarter = viewModel.game.rotationStyle { return true }
+        return false
     }
 
     var body: some View {
@@ -42,12 +48,22 @@ struct LiveGameView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
                         viewModel.pause()
-                        onSaveStats(viewModel.buildStats())
-                        dismiss()
+                        showDoneConfirmation = true
                     }
                     .fontWeight(.semibold)
                     .foregroundStyle(Color.crAccent)
                 }
+            }
+            .alert("End Game?", isPresented: $showDoneConfirmation) {
+                Button("End Game", role: .destructive) {
+                    onEndGame(viewModel.buildStats())
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {
+                    viewModel.startStop()
+                }
+            } message: {
+                Text("This will save your stats and mark the game as complete.")
             }
         }
     }
@@ -56,6 +72,16 @@ struct LiveGameView: View {
 
     private var gameClockSection: some View {
         VStack(spacing: 12) {
+            HStack {
+                Text("GAME CLOCK")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(Color.crTextSecondary)
+                    .tracking(1.2)
+                Spacer()
+                Text("Q\(viewModel.currentQuarter) of \(viewModel.game.format.quarters)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.crAccent)
+            }
             Text(viewModel.formattedTime(viewModel.gameSecondsRemaining))
                 .font(.system(size: 72, weight: .thin, design: .monospaced))
                 .foregroundStyle(Color.crTextPrimary)
@@ -72,20 +98,33 @@ struct LiveGameView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 20)
         .crSurfaceCard()
     }
 
     // MARK: - Score
 
     private var scoreSection: some View {
-        HStack(spacing: 0) {
-            scoreColumn(label: "US", value: $viewModel.usScore)
+        VStack(spacing: 0) {
+            Text("SCORE")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(Color.crTextSecondary)
+                .tracking(1.2)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
             Rectangle()
-                .fill(Color.crTextSecondary.opacity(0.2))
-                .frame(width: 1)
-                .padding(.vertical, 16)
-            scoreColumn(label: "THEM", value: $viewModel.themScore)
+                .fill(Color.crTextSecondary.opacity(0.1))
+                .frame(height: 1)
+            HStack(spacing: 0) {
+                scoreColumn(label: "US", value: $viewModel.usScore)
+                Rectangle()
+                    .fill(Color.crTextSecondary.opacity(0.2))
+                    .frame(width: 1)
+                    .padding(.vertical, 16)
+                scoreColumn(label: "THEM", value: $viewModel.themScore)
+            }
         }
         .crSurfaceCard()
     }
@@ -125,10 +164,16 @@ struct LiveGameView: View {
 
     // MARK: - Current Rotation
 
+    private var rotationSectionLabel: String {
+        isQuarterRotation
+            ? "Quarter \(viewModel.currentSlotIndex + 1) of \(viewModel.totalSlots)"
+            : "Rotation \(viewModel.currentSlotIndex + 1) of \(viewModel.totalSlots)"
+    }
+
     private var rotationSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                sectionLabel("Rotation \(viewModel.currentSlotIndex + 1) of \(viewModel.totalSlots)")
+                sectionLabel(rotationSectionLabel)
                 Spacer()
                 Text(viewModel.formattedTime(viewModel.slotSecondsRemaining))
                     .font(.caption.monospacedDigit().weight(.semibold))
@@ -193,12 +238,14 @@ struct LiveGameView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionLabel("Ground Balls")
             VStack(spacing: 0) {
+                opponentGBRow
+                if !viewModel.presentPlayers.isEmpty {
+                    divider
+                }
                 ForEach(Array(viewModel.presentPlayers.enumerated()), id: \.element.id) { index, player in
                     if index > 0 { divider }
                     groundBallRow(player: player)
                 }
-                divider
-                opponentGBRow
             }
             .crSurfaceCard()
         }
@@ -228,12 +275,17 @@ struct LiveGameView: View {
     }
 
     private var opponentGBRow: some View {
-        HStack {
-            Image(systemName: "person.fill.xmark")
-                .font(.caption)
-                .foregroundStyle(Color.crDanger)
-                .frame(width: 36)
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.crDanger.opacity(0.15))
+                    .frame(width: 36, height: 36)
+                Image(systemName: "person.fill.xmark")
+                    .font(.caption)
+                    .foregroundStyle(Color.crDanger)
+            }
             Text("Opponent")
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Color.crTextSecondary)
             Spacer()
             counterControl(
@@ -242,7 +294,9 @@ struct LiveGameView: View {
                 onIncrement: { viewModel.opponentGroundBalls += 1 }
             )
         }
-        .padding()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color.crDanger.opacity(0.05))
     }
 
     private func counterControl(count: Int, onDecrement: @escaping () -> Void, onIncrement: @escaping () -> Void) -> some View {
@@ -273,10 +327,14 @@ struct LiveGameView: View {
                 .font(.title3)
                 .foregroundStyle(Color.crWarning)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Rotation Due")
+                Text(isQuarterRotation ? "Quarter Ended" : "Rotation Due")
                     .font(.headline)
                     .foregroundStyle(Color.crTextPrimary)
-                Text(viewModel.isLastSlot ? "Final rotation is active" : "Sub in the next group")
+                Text(viewModel.isLastSlot
+                    ? "Final rotation is active"
+                    : isQuarterRotation
+                    ? "Tap to start Q\(viewModel.currentSlotIndex + 2)"
+                    : "Sub in the next group")
                     .font(.caption)
                     .foregroundStyle(Color.crTextSecondary)
             }
@@ -285,7 +343,7 @@ struct LiveGameView: View {
                 Button {
                     withAnimation { viewModel.advanceRotation() }
                 } label: {
-                    Text("Next")
+                    Text(isQuarterRotation ? "Start Q\(viewModel.currentSlotIndex + 2)" : "Next")
                         .font(.headline)
                         .foregroundStyle(Color.crBackground)
                         .padding(.horizontal, 20)
@@ -338,6 +396,6 @@ struct LiveGameView: View {
             createdAt: Date()
         ),
         players: [],
-        onSaveStats: { _ in }
+        onEndGame: { _ in }
     )
 }
