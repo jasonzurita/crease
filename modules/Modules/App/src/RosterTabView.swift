@@ -38,6 +38,15 @@ public struct RosterTabView: View {
                         }
                     }
                 }
+                ToolbarItem(placement: .topBarLeading) {
+                    NavigationLink {
+                        TeamSeasonStatsView()
+                    } label: {
+                        Image(systemName: "chart.bar.xaxis.ascending")
+                            .foregroundStyle(Color.crAccent)
+                    }
+                    .accessibilityLabel("Season stats")
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showingAddPlayer = true
