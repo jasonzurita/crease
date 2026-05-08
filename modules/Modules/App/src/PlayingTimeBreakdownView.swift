@@ -72,7 +72,7 @@ private struct BreakdownPlayerRow: View {
     let totalMinutes: Int
 
     private var showGoalieSplit: Bool {
-        row.goalMinutes > 0 && row.fieldMinutes > 0
+        row.goalMinutes > 0
     }
 
     var body: some View {
@@ -105,6 +105,13 @@ private struct BreakdownPlayerRow: View {
                     .font(.caption2)
                     .foregroundStyle(Color.crTextSecondary.opacity(0.5))
             }
+            if showGoalieSplit {
+                Text(row.fieldMinutes > 0
+                    ? "In goal: \(row.goalMinutes)m · Field: \(row.fieldMinutes)m"
+                    : "In goal: \(row.goalMinutes)m")
+                    .font(.caption2)
+                    .foregroundStyle(Color.crWarning)
+            }
             if let note = row.conflictNote {
                 Text(note)
                     .font(.caption2)
@@ -133,17 +140,6 @@ private struct BreakdownPlayerRow: View {
                 }
             }
             .frame(height: 12)
-
-            if showGoalieSplit {
-                HStack(spacing: 8) {
-                    Text("Goal \(row.goalMinutes)m")
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(Color.crTextSecondary)
-                    Text("Field \(row.fieldMinutes)m")
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(Color.crTextSecondary)
-                }
-            }
 
             Text("\(row.projectedMinutes)m")
                 .font(.caption.monospacedDigit().weight(.semibold))

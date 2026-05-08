@@ -4,9 +4,7 @@ import SwiftUI
 
 struct SeasonEditorView: View {
     @State private var viewModel: SeasonEditorViewModel
-    @Environment(\.dismiss) private var dismiss
     private let store: SeasonStore
-    @State private var errorMessage: String?
     @FocusState private var focusedField: FocusField?
 
     private enum FocusField { case teamName, seasonName }
@@ -31,21 +29,8 @@ struct SeasonEditorView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.crSurface, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Save") { save() }
-                    .foregroundStyle(viewModel.isValid ? Color.crAccent : Color.crTextSecondary)
-                    .fontWeight(.semibold)
-                    .disabled(!viewModel.isValid)
-            }
-        }
-        .alert("Could Not Save", isPresented: Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
-        )) {
-            Button("OK") { errorMessage = nil }
-        } message: {
-            Text(errorMessage ?? "")
+        .onDisappear {
+            if viewModel.isValid { try? viewModel.save(in: store) }
         }
     }
 
@@ -69,7 +54,10 @@ struct SeasonEditorView: View {
                 divider
                 stepperRow(label: "Quarter Length", value: $viewModel.gameFormatDefaults.quarterLengthMinutes, range: 5 ... 20, unit: "min")
                 divider
-                stepperRow(label: "Players Per Side", value: $viewModel.gameFormatDefaults.playersPerSide, range: 5 ... 11, unit: nil)
+                Toggle("Include Goalie", isOn: $viewModel.gameFormatDefaults.hasGoalie)
+                    .foregroundStyle(Color.crTextPrimary)
+                    .tint(Color.crAccent)
+                    .padding()
                 divider
                 stepperRow(label: "Attack", value: attackCountBinding, range: 0 ... 10, unit: nil)
                 divider
@@ -84,16 +72,14 @@ struct SeasonEditorView: View {
     }
 
     private var positionTotalRow: some View {
-        let counts = viewModel.gameFormatDefaults.effectivePositionCounts
-        let total = counts.fieldTotal + 1
-        let isValid = total == viewModel.gameFormatDefaults.playersPerSide
+        let total = viewModel.gameFormatDefaults.derivedPlayersPerSide
         return HStack {
-            Text("Total on field")
+            Text("Players on field")
                 .foregroundStyle(Color.crTextSecondary)
             Spacer()
-            Text("\(total) of \(viewModel.gameFormatDefaults.playersPerSide)")
+            Text("\(total)")
                 .font(.subheadline.monospacedDigit().weight(.semibold))
-                .foregroundStyle(isValid ? Color.crSuccess : Color.crDanger)
+                .foregroundStyle(Color.crTextPrimary)
         }
         .padding()
     }
@@ -129,15 +115,6 @@ struct SeasonEditorView: View {
                 viewModel.gameFormatDefaults.positionCounts = counts
             }
         )
-    }
-
-    private func save() {
-        do {
-            try viewModel.save(in: store)
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
     }
 
     private var divider: some View {

@@ -22,17 +22,22 @@ final class RotationOutputViewModel {
     private(set) var swapSourceCell: CellID?
     private(set) var swapSourcePlayerID: UUID?
 
-    var cellActionMenuTarget: CellID?
-    private(set) var cellActionMenuPlayerID: UUID?
-
     var showBenchSwapSheet = false
     private var benchSwapTarget: CellID?
     private(set) var benchSwapCandidates: [Player] = []
     var expandedBenchSlots: Set<Int> = []
-    private var previousPlan: RotationPlan?
-    private(set) var canUndo = false
-    private(set) var hasManualChanges = false
+    private var undoStack: [RotationPlan] = []
+    private static let undoLimit = 10
+    var canUndo: Bool {
+        !undoStack.isEmpty
+    }
+
+    var hasManualChanges: Bool {
+        !undoStack.isEmpty
+    }
+
     var showRegenerateWarning = false
+    private(set) var isRegenerating = false
 
     // Lineup card
     var showLineupCardOptions = false
@@ -49,6 +54,7 @@ final class RotationOutputViewModel {
     // Position counts editor
     var showPositionCountsEditor = false
     var editedPositionCounts: PositionCounts?
+    var editedHasGoalie: Bool = true
 
     /// Live game mode
     var showLiveMode = false
@@ -132,15 +138,6 @@ final class RotationOutputViewModel {
         guard let plan = game.rotationPlan, cell.slotIndex < plan.slots.count else { return false }
         return plan.slots[cell.slotIndex].assignments
             .first { $0.position == cell.position }?.isLocked ?? false
-    }
-
-    var isActionTargetLocked: Bool {
-        guard let cell = cellActionMenuTarget,
-              let playerID = cellActionMenuPlayerID,
-              let plan = game.rotationPlan,
-              cell.slotIndex < plan.slots.count else { return false }
-        return plan.slots[cell.slotIndex].assignments
-            .first { $0.position == cell.position && $0.playerID == playerID }?.isLocked ?? false
     }
 
     func slotHeader(for slot: RotationSlot) -> String {
@@ -246,38 +243,36 @@ final class RotationOutputViewModel {
     // MARK: - Cell tap — shows action menu or completes a pending swap
 
     func tapCell(slotIndex: Int, position: Position, playerID: UUID) {
-        guard let plan = game.rotationPlan, slotIndex < plan.slots.count else { return }
+        guard game.rotationPlan != nil, slotIndex < (game.rotationPlan?.slots.count ?? 0) else { return }
         let cell = CellID(slotIndex: slotIndex, position: position)
-
-        if let source = swapSourceCell, let sourcePID = swapSourcePlayerID {
-            swapSourceCell = nil
-            swapSourcePlayerID = nil
-            if source != cell || sourcePID != playerID {
-                performSwap(from: source, sourcePlayerID: sourcePID, to: cell, destPlayerID: playerID)
-            }
-            return
+        guard let source = swapSourceCell, let sourcePID = swapSourcePlayerID else { return }
+        swapSourceCell = nil
+        swapSourcePlayerID = nil
+        if source != cell || sourcePID != playerID {
+            performSwap(from: source, sourcePlayerID: sourcePID, to: cell, destPlayerID: playerID)
         }
-
-        guard plan.slots[slotIndex].assignments
-            .contains(where: { $0.position == position && $0.playerID == playerID }) else { return }
-        cellActionMenuTarget = cell
-        cellActionMenuPlayerID = playerID
     }
 
-    func clearCellActionMenu() {
-        cellActionMenuTarget = nil
-        cellActionMenuPlayerID = nil
+    func beginSwap(slotIndex: Int, position: Position, playerID: UUID) {
+        swapSourceCell = CellID(slotIndex: slotIndex, position: position)
+        swapSourcePlayerID = playerID
+    }
+
+    func hasBenchCandidates(slotIndex: Int, position: Position) -> Bool {
+        guard let plan = game.rotationPlan, slotIndex < plan.slots.count else { return false }
+        let slot = plan.slots[slotIndex]
+        return players.contains { slot.bench.contains($0.id) && $0.positions.contains(position) }
+    }
+
+    func removePlayerDirect(slotIndex: Int, position: Position, playerID: UUID) {
+        removePlayer(at: CellID(slotIndex: slotIndex, position: position), playerID: playerID)
+    }
+
+    func toggleLockDirect(slotIndex: Int, position: Position, playerID: UUID) {
+        toggleLock(cell: CellID(slotIndex: slotIndex, position: position), playerID: playerID)
     }
 
     // MARK: - Swap mode
-
-    func initiateSwapMode() {
-        guard let cell = cellActionMenuTarget, let playerID = cellActionMenuPlayerID else { return }
-        cellActionMenuTarget = nil
-        cellActionMenuPlayerID = nil
-        swapSourceCell = cell
-        swapSourcePlayerID = playerID
-    }
 
     func cancelSwap() {
         swapSourceCell = nil
@@ -305,23 +300,6 @@ final class RotationOutputViewModel {
     }
 
     // MARK: - Bench swap
-
-    func benchCandidatesForActionTarget() -> [Player] {
-        guard let cell = cellActionMenuTarget,
-              let plan = game.rotationPlan,
-              cell.slotIndex < plan.slots.count else { return [] }
-        let slot = plan.slots[cell.slotIndex]
-        return players.filter { player in
-            slot.bench.contains(player.id) && player.positions.contains(cell.position)
-        }
-    }
-
-    func initiateBenchSwapFromMenu() {
-        guard let cell = cellActionMenuTarget else { return }
-        cellActionMenuTarget = nil
-        cellActionMenuPlayerID = nil
-        initiateBenchSwap(slotIndex: cell.slotIndex, position: cell.position)
-    }
 
     func initiateBenchSwap(slotIndex: Int, position: Position) {
         guard let plan = game.rotationPlan, slotIndex < plan.slots.count else { return }
@@ -359,21 +337,7 @@ final class RotationOutputViewModel {
         commitPlan(plan)
     }
 
-    // MARK: - Lock / Remove (called from action menu)
-
-    func toggleLockFromMenu() {
-        guard let cell = cellActionMenuTarget, let playerID = cellActionMenuPlayerID else { return }
-        cellActionMenuTarget = nil
-        cellActionMenuPlayerID = nil
-        toggleLock(cell: cell, playerID: playerID)
-    }
-
-    func removePlayerFromMenu() {
-        guard let cell = cellActionMenuTarget, let playerID = cellActionMenuPlayerID else { return }
-        cellActionMenuTarget = nil
-        cellActionMenuPlayerID = nil
-        removePlayer(at: cell, playerID: playerID)
-    }
+    // MARK: - Lock / Remove
 
     /// Position-level toggle — uses first player. Kept for direct test access.
     func toggleLock(cell: CellID) {
@@ -412,20 +376,17 @@ final class RotationOutputViewModel {
     // MARK: - Undo
 
     private func saveUndoState() {
-        previousPlan = game.rotationPlan
-        canUndo = true
-        hasManualChanges = true
+        guard let plan = game.rotationPlan else { return }
+        if undoStack.count >= Self.undoLimit { undoStack.removeFirst() }
+        undoStack.append(plan)
     }
 
     func undo() {
-        guard let prev = previousPlan else { return }
+        guard let prev = undoStack.popLast() else { return }
         var updated = game
         updated.rotationPlan = prev
         game = updated
         try? store.updateGame(updated)
-        previousPlan = nil
-        canUndo = false
-        hasManualChanges = false
     }
 
     // MARK: - Violations
@@ -470,7 +431,7 @@ final class RotationOutputViewModel {
     // MARK: - Regenerate
 
     func requestRegenerate() {
-        if hasManualChanges {
+        if plan != nil {
             showRegenerateWarning = true
         } else {
             doRegenerate()
@@ -479,17 +440,20 @@ final class RotationOutputViewModel {
 
     func confirmRegenerate() {
         showRegenerateWarning = false
-        hasManualChanges = false
         doRegenerate()
     }
 
     private func doRegenerate() {
-        try? store.generatePlan(for: game)
-        if let updated = store.games.first(where: { $0.id == game.id }) {
-            game = updated
+        undoStack.removeAll()
+        isRegenerating = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.2))
+            try? store.generatePlan(for: game)
+            if let updated = store.games.first(where: { $0.id == game.id }) {
+                game = updated
+            }
+            isRegenerating = false
         }
-        previousPlan = nil
-        canUndo = false
     }
 
     // MARK: - Fairness targets
@@ -537,6 +501,7 @@ final class RotationOutputViewModel {
 
     func openPositionCountsEditor() {
         editedPositionCounts = game.format.positionCounts ?? game.format.effectivePositionCounts
+        editedHasGoalie = game.format.hasGoalie
         showPositionCountsEditor = true
     }
 
@@ -544,6 +509,8 @@ final class RotationOutputViewModel {
         guard let counts = editedPositionCounts else { return }
         var updated = game
         updated.format.positionCounts = counts
+        updated.format.hasGoalie = editedHasGoalie
+        updated.format.playersPerSide = updated.format.derivedPlayersPerSide
         game = updated
         try? store.updateGame(updated)
         showPositionCountsEditor = false

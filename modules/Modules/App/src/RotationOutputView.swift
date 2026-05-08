@@ -32,6 +32,9 @@ public struct RotationOutputView: View {
         ZStack {
             Color.crBackground.ignoresSafeArea()
             mainContent
+            if viewModel.isRegenerating {
+                GeneratingPlanOverlay()
+            }
         }
         .navigationTitle("vs. \(viewModel.game.opponent)")
         .navigationBarTitleDisplayMode(.inline)
@@ -46,37 +49,11 @@ public struct RotationOutputView: View {
             )
             .presentationDetents([.medium])
         }
-        .confirmationDialog(
-            "What would you like to do?",
-            isPresented: Binding(
-                get: { viewModel.cellActionMenuTarget != nil },
-                set: { if !$0 { viewModel.clearCellActionMenu() } }
-            ),
-            titleVisibility: .visible
-        ) {
-            if viewModel.cellActionMenuTarget != nil {
-                Button("Swap Positions") {
-                    viewModel.initiateSwapMode()
-                }
-                if !viewModel.benchCandidatesForActionTarget().isEmpty {
-                    Button("Swap from Bench") {
-                        viewModel.initiateBenchSwapFromMenu()
-                    }
-                }
-                Button("Move to Bench", role: .destructive) {
-                    viewModel.removePlayerFromMenu()
-                }
-                Button(viewModel.isActionTargetLocked ? "Unlock Cell" : "Lock Cell") {
-                    viewModel.toggleLockFromMenu()
-                }
-                Button("Cancel", role: .cancel) {}
-            }
-        }
         .alert("Regenerate Plan?", isPresented: $viewModel.showRegenerateWarning) {
             Button("Regenerate", role: .destructive) { viewModel.confirmRegenerate() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Unlocked manual changes will be lost. Locked cells are preserved.")
+            Text("A new rotation plan will be generated. Locked cells are preserved; all other assignments will be replaced.")
         }
         .sheet(isPresented: $viewModel.showLineupCardOptions) {
             LineupCardOptionsSheet(viewModel: viewModel)
@@ -111,6 +88,8 @@ public struct RotationOutputView: View {
     private var mainContent: some View {
         if let plan = viewModel.plan {
             VStack(spacing: 0) {
+                SummaryStripView(viewModel: viewModel)
+                Divider().background(Color.crTextSecondary.opacity(0.15))
                 tabPicker
                 Divider().background(Color.crTextSecondary.opacity(0.15))
                 if activeTab == .rotation {
@@ -135,7 +114,6 @@ public struct RotationOutputView: View {
                         swapModeBanner
                     }
                     rotationGrid(plan)
-                    SummaryStripView(viewModel: viewModel)
                 }
             }
             if viewModel.canUndo {
@@ -204,13 +182,15 @@ public struct RotationOutputView: View {
                 Color.clear.frame(height: headerHeight)
                 ForEach(Self.orderedPositions, id: \.self) { position in
                     let rowCount = maxPlayerCount(position, in: plan)
+                    positionGroupLabelDivider(for: position)
                     Text(position.rawValue)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.crTextSecondary)
+                        .foregroundStyle(positionAccentColor(position))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.leading, 8)
                         .frame(height: CGFloat(rowCount) * cellHeight)
                 }
+                positionGroupLabelDivider(for: nil)
                 Text("Bench")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.crTextSecondary)
@@ -241,6 +221,11 @@ public struct RotationOutputView: View {
                     ForEach(Self.orderedPositions, id: \.self) { position in
                         let maxCount = maxPlayerCount(position, in: plan)
                         HStack(spacing: 0) {
+                            ForEach(0 ..< plan.slots.count, id: \.self) { _ in
+                                positionDividerCell(position: position, width: colWidth)
+                            }
+                        }
+                        HStack(spacing: 0) {
                             ForEach(Array(plan.slots.enumerated()), id: \.offset) { index, slot in
                                 let assignments = slot.assignments.filter { $0.position == position }
                                 VStack(spacing: 0) {
@@ -253,9 +238,24 @@ public struct RotationOutputView: View {
                                                 jerseyNumber: viewModel.playerJerseyNumber(for: assignment.playerID),
                                                 isSelected: viewModel.swapSourceCell == cell && viewModel.swapSourcePlayerID == assignment.playerID,
                                                 isLocked: assignment.isLocked,
-                                                onTap: { viewModel.tapCell(slotIndex: index, position: position, playerID: assignment.playerID) },
-                                                onLongPress: { viewModel.tapCell(slotIndex: index, position: position, playerID: assignment.playerID) }
-                                            )
+                                                inSwapMode: viewModel.swapSourceCell != nil,
+                                                onTap: { viewModel.tapCell(slotIndex: index, position: position, playerID: assignment.playerID) }
+                                            ) {
+                                                Button("Swap Positions") {
+                                                    viewModel.beginSwap(slotIndex: index, position: position, playerID: assignment.playerID)
+                                                }
+                                                if viewModel.hasBenchCandidates(slotIndex: index, position: position) {
+                                                    Button("Swap from Bench") {
+                                                        viewModel.initiateBenchSwap(slotIndex: index, position: position)
+                                                    }
+                                                }
+                                                Button("Move to Bench", role: .destructive) {
+                                                    viewModel.removePlayerDirect(slotIndex: index, position: position, playerID: assignment.playerID)
+                                                }
+                                                Button(assignment.isLocked ? "Unlock Cell" : "Lock Cell") {
+                                                    viewModel.toggleLockDirect(slotIndex: index, position: position, playerID: assignment.playerID)
+                                                }
+                                            }
                                             .frame(width: colWidth, height: cellHeight)
                                         } else {
                                             Color.clear
@@ -277,7 +277,11 @@ public struct RotationOutputView: View {
                         }
                     }
 
-                    // Bench row
+                    HStack(spacing: 0) {
+                        ForEach(0 ..< plan.slots.count, id: \.self) { _ in
+                            positionDividerCell(position: nil, width: colWidth)
+                        }
+                    }
                     HStack(alignment: .top, spacing: 0) {
                         ForEach(Array(plan.slots.enumerated()), id: \.offset) { index, slot in
                             benchCell(slot: slot, slotIndex: index)
@@ -288,6 +292,42 @@ public struct RotationOutputView: View {
             }
         }
         .padding(.bottom, 8)
+    }
+
+    private func positionGroupLabelDivider(for position: Position?) -> some View {
+        ZStack(alignment: .bottom) {
+            Color.crTextSecondary.opacity(0.06)
+                .frame(maxWidth: .infinity)
+                .frame(height: 4)
+            Rectangle()
+                .fill(position.map(positionAccentColor) ?? Color.crTextSecondary.opacity(0.3))
+                .frame(maxWidth: .infinity)
+                .frame(height: 1)
+        }
+    }
+
+    private func positionDividerCell(position: Position?, width: CGFloat) -> some View {
+        ZStack(alignment: .bottom) {
+            Color.crTextSecondary.opacity(0.06)
+                .frame(width: width, height: 4)
+            Rectangle()
+                .fill(position.map(positionAccentColor) ?? Color.crTextSecondary.opacity(0.3))
+                .frame(width: width, height: 1)
+        }
+        .overlay(alignment: .trailing) {
+            Rectangle()
+                .fill(Color.crTextSecondary.opacity(0.15))
+                .frame(width: 1)
+        }
+    }
+
+    private func positionAccentColor(_ position: Position) -> Color {
+        switch position {
+        case .goalie: return Color.crWarning.opacity(0.6)
+        case .attack: return Color.crAccent.opacity(0.6)
+        case .midfield: return Color.crSuccess.opacity(0.6)
+        case .defense: return Color.crTextSecondary.opacity(0.4)
+        }
     }
 
     private func maxPlayerCount(_ position: Position, in plan: RotationPlan) -> Int {

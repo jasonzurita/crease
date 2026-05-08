@@ -14,6 +14,7 @@ public final class PlayerFormViewModel {
     public var jerseyNumber: String = ""
     public var positions: Set<Position> = []
     public var tier: Tier = .developing
+    public var avatarImageData: Data?
 
     public var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
@@ -30,6 +31,7 @@ public final class PlayerFormViewModel {
             jerseyNumber = String(player.jerseyNumber)
             positions = player.positions
             tier = player.tier
+            avatarImageData = player.avatarImageData
         }
     }
 
@@ -44,7 +46,8 @@ public final class PlayerFormViewModel {
                 name: trimmedName,
                 jerseyNumber: number,
                 positions: positions,
-                tier: tier
+                tier: tier,
+                avatarImageData: avatarImageData
             )
             try store.createPlayer(player)
         case let .edit(existing):
@@ -53,7 +56,8 @@ public final class PlayerFormViewModel {
                 name: trimmedName,
                 jerseyNumber: number,
                 positions: positions,
-                tier: tier
+                tier: tier,
+                avatarImageData: avatarImageData
             )
             try store.updatePlayer(updated)
         }

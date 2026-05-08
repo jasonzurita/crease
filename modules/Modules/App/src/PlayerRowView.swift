@@ -11,15 +11,15 @@ public struct PlayerRowView: View {
 
     public var body: some View {
         HStack(spacing: 12) {
-            Text("#\(player.jerseyNumber)")
-                .font(.body.monospacedDigit())
-                .foregroundStyle(Color.crTextSecondary)
-                .frame(minWidth: 36, alignment: .leading)
+            PlayerAvatarView(player: player, size: 40)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(player.name)
                         .foregroundStyle(Color.crTextPrimary)
+                    Text("#\(player.jerseyNumber)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(Color.crTextSecondary)
                     if player.positions.contains(.goalie) {
                         Text("G")
                             .font(.caption.weight(.bold))

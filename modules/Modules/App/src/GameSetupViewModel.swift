@@ -17,7 +17,7 @@ final class GameSetupViewModel {
     var date: Date
     var isHome: Bool = true
 
-    // Step 2 — Attendance
+    /// Step 2 — Attendance
     var attendance: [PlayerAttendance]
 
     // Step 3 — Options
@@ -37,9 +37,9 @@ final class GameSetupViewModel {
     }
 
     init(formatDefaults: GameFormatDefaults, players: [Player]) {
-        self.format = formatDefaults
-        self.date = Self.nextSunday()
-        self.attendance = players.map {
+        format = formatDefaults
+        date = Self.nextSunday()
+        attendance = players.map {
             PlayerAttendance(id: $0.id, isPresent: true, lateArrivalQuarter: nil, earlyDepartureQuarter: nil)
         }
     }
@@ -62,6 +62,8 @@ final class GameSetupViewModel {
 
     @discardableResult
     func createGame(in store: SeasonStore) throws -> Game {
+        var syncedFormat = format
+        syncedFormat.playersPerSide = format.derivedPlayersPerSide
         let game = Game(
             id: UUID(),
             opponent: opponent.trimmingCharacters(in: .whitespaces),
@@ -69,7 +71,7 @@ final class GameSetupViewModel {
             isHome: isHome,
             status: .planned,
             attendance: attendance,
-            format: format,
+            format: syncedFormat,
             rotationStyle: rotationStyle,
             fairnessTargets: fairnessTargets,
             competitivenessMode: competitivenessMode,

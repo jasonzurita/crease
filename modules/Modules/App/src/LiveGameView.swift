@@ -206,13 +206,16 @@ struct LiveGameView: View {
 
     private func groundBallRow(player: Player) -> some View {
         let count = viewModel.groundBalls[player.id] ?? 0
-        return HStack {
-            Text("#\(player.jerseyNumber)")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(Color.crTextSecondary)
-                .frame(width: 36, alignment: .leading)
-            Text(player.name)
-                .foregroundStyle(Color.crTextPrimary)
+        return HStack(spacing: 12) {
+            PlayerAvatarView(player: player, size: 36)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(player.name)
+                    .foregroundStyle(Color.crTextPrimary)
+                    .font(.subheadline)
+                Text("#\(player.jerseyNumber)")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(Color.crTextSecondary)
+            }
             Spacer()
             counterControl(
                 count: count,
@@ -220,7 +223,8 @@ struct LiveGameView: View {
                 onIncrement: { viewModel.incrementGroundBalls(for: player.id) }
             )
         }
-        .padding()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 
     private var opponentGBRow: some View {

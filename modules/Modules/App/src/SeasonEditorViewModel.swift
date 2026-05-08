@@ -27,7 +27,9 @@ final class SeasonEditorViewModel {
         var updated = season
         updated.teamName = teamName.trimmingCharacters(in: .whitespaces)
         updated.seasonName = seasonName.trimmingCharacters(in: .whitespaces)
-        updated.gameFormatDefaults = gameFormatDefaults
+        var defaults = gameFormatDefaults
+        defaults.playersPerSide = gameFormatDefaults.derivedPlayersPerSide
+        updated.gameFormatDefaults = defaults
         try store.updateSeason(updated)
     }
 }

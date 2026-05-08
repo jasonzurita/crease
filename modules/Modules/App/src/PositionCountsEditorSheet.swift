@@ -11,12 +11,17 @@ struct PositionCountsEditorSheet: View {
                 Color.crBackground.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 16) {
-                        Text("Set how many players line up at each position. The total (including 1 goalie) should equal players per side.")
+                        Text("Set how many players line up at each position and whether a goalie is included.")
                             .font(.caption)
                             .foregroundStyle(Color.crTextSecondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
                         VStack(spacing: 0) {
+                            Toggle("Include Goalie", isOn: goalieBinding)
+                                .foregroundStyle(Color.crTextPrimary)
+                                .tint(Color.crAccent)
+                                .padding()
+                            divider
                             countRow("Attack", binding: attackBinding)
                             divider
                             countRow("Midfield", binding: midfieldBinding)
@@ -66,18 +71,18 @@ struct PositionCountsEditorSheet: View {
     }
 
     private var totalRow: some View {
-        let total = (viewModel.editedPositionCounts?.fieldTotal ?? 0) + 1
-        let playersPerSide = viewModel.game.format.playersPerSide
-        let isValid = total == playersPerSide
+        let fieldTotal = viewModel.editedPositionCounts?.fieldTotal ?? 0
+        let hasGoalie = viewModel.editedHasGoalie
+        let total = fieldTotal + (hasGoalie ? 1 : 0)
 
         return HStack {
-            Text("Total on field")
+            Text("Players on field")
                 .foregroundStyle(Color.crTextSecondary)
                 .font(.subheadline)
             Spacer()
-            Text("\(total) of \(playersPerSide)")
+            Text("\(total)")
                 .font(.subheadline.monospacedDigit().weight(.semibold))
-                .foregroundStyle(isValid ? Color.crSuccess : Color.crDanger)
+                .foregroundStyle(Color.crTextPrimary)
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 16)
@@ -88,6 +93,13 @@ struct PositionCountsEditorSheet: View {
             .fill(Color.white.opacity(0.08))
             .frame(height: 1)
             .padding(.horizontal, 16)
+    }
+
+    private var goalieBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.editedHasGoalie },
+            set: { viewModel.editedHasGoalie = $0 }
+        )
     }
 
     private var attackBinding: Binding<Int> {

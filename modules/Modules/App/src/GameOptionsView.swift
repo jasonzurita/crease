@@ -33,7 +33,10 @@ struct GameOptionsView: View {
                 divider
                 stepperRow("Quarter Length", value: $viewModel.format.quarterLengthMinutes, range: 5 ... 20, unit: "min")
                 divider
-                stepperRow("Players Per Side", value: $viewModel.format.playersPerSide, range: 5 ... 11)
+                Toggle("Include Goalie", isOn: $viewModel.format.hasGoalie)
+                    .foregroundStyle(Color.crTextPrimary)
+                    .tint(Color.crAccent)
+                    .padding()
                 divider
                 stepperRow("Attack", value: attackCountBinding, range: 0 ... 10)
                 divider
@@ -48,16 +51,14 @@ struct GameOptionsView: View {
     }
 
     private var positionTotalRow: some View {
-        let counts = viewModel.format.effectivePositionCounts
-        let total = counts.fieldTotal + 1
-        let isValid = total == viewModel.format.playersPerSide
+        let total = viewModel.format.derivedPlayersPerSide
         return HStack {
-            Text("Total on field")
+            Text("Players on field")
                 .foregroundStyle(Color.crTextSecondary)
             Spacer()
-            Text("\(total) of \(viewModel.format.playersPerSide)")
+            Text("\(total)")
                 .font(.subheadline.monospacedDigit().weight(.semibold))
-                .foregroundStyle(isValid ? Color.crSuccess : Color.crDanger)
+                .foregroundStyle(Color.crTextPrimary)
         }
         .padding()
     }

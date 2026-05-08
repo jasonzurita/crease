@@ -1,10 +1,13 @@
 import CRDesign
 import CRModel
+import PhotosUI
 import SwiftUI
+import UIKit
 
 public struct PlayerFormView: View {
     @State private var viewModel: PlayerFormViewModel
     @State private var errorMessage: String?
+    @State private var selectedPhotoItem: PhotosPickerItem?
     @Environment(\.dismiss) private var dismiss
     @FocusState private var focusedField: FocusField?
 
@@ -28,6 +31,7 @@ public struct PlayerFormView: View {
                 Color.crBackground.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 24) {
+                        avatarSection
                         identitySection
                         positionsSection
                         tierSection
@@ -59,6 +63,50 @@ public struct PlayerFormView: View {
         } message: {
             Text(errorMessage ?? "")
         }
+        .onChange(of: selectedPhotoItem) { _, item in
+            Task {
+                guard let item else { return }
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let compressed = compressImage(data) {
+                    viewModel.avatarImageData = compressed
+                }
+            }
+        }
+    }
+
+    private var avatarSection: some View {
+        VStack(spacing: 12) {
+            let previewPlayer = Player(
+                id: UUID(),
+                name: viewModel.name.isEmpty ? "?" : viewModel.name,
+                jerseyNumber: Int(viewModel.jerseyNumber) ?? 0,
+                positions: [],
+                tier: .developing,
+                avatarImageData: viewModel.avatarImageData
+            )
+            PlayerAvatarView(player: previewPlayer, size: 80)
+
+            HStack(spacing: 12) {
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                    Label("Choose Photo", systemImage: "photo")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Color.crAccent)
+                }
+
+                if viewModel.avatarImageData != nil {
+                    Button {
+                        viewModel.avatarImageData = nil
+                        selectedPhotoItem = nil
+                    } label: {
+                        Label("Remove", systemImage: "xmark.circle")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(Color.crTextSecondary)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
     }
 
     private var identitySection: some View {
@@ -190,6 +238,16 @@ public struct PlayerFormView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func compressImage(_ data: Data) -> Data? {
+        guard let image = UIImage(data: data) else { return nil }
+        let maxDimension: CGFloat = 300
+        let scale = min(maxDimension / image.size.width, maxDimension / image.size.height, 1)
+        let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let resized = renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: newSize)) }
+        return resized.jpegData(compressionQuality: 0.7)
     }
 }
 
