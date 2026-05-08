@@ -6,10 +6,12 @@ struct PlayerAvatarView: View {
     let player: Player
     let size: CGFloat
 
+    @State private var decodedImage: UIImage? = nil
+
     var body: some View {
         Group {
-            if let data = player.avatarImageData, let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage)
+            if let image = decodedImage {
+                Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
             } else {
@@ -18,6 +20,15 @@ struct PlayerAvatarView: View {
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
+        .task(id: player.avatarImageData) {
+            guard let data = player.avatarImageData else {
+                decodedImage = nil
+                return
+            }
+            decodedImage = await Task.detached(priority: .userInitiated) {
+                UIImage(data: data)
+            }.value
+        }
     }
 
     private var initialsView: some View {
