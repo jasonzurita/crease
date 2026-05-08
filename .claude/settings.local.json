@@ -32,7 +32,10 @@
       "Bash(xargs ls)",
       "Bash(grep -E \"\\\\.swift$\")",
       "Bash(cat)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(awk '{print $NF}')",
+      "Bash(xargs basename -a)",
+      "mcp__xcode__GetBuildLog"
     ]
   }
 }
