@@ -11,7 +11,7 @@ final class CompletionSheetViewModel {
     var playerStats: [PlayerStat]
 
     init(players: [Player]) {
-        playerStats = players.map { PlayerStat(playerID: $0.id, goals: 0, groundBalls: 0) }
+        playerStats = players.map { PlayerStat(playerID: $0.id, goals: 0, groundBalls: 0, playingTimeSeconds: 0) }
     }
 
     func makeStats() -> GameStats {

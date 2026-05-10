@@ -20,13 +20,29 @@ public struct PostGameSummaryView: View {
     private var presentPlayers: [Player] {
         players
             .filter { p in game.attendance.first { $0.id == p.id }?.isPresent == true }
-            .sorted { projectedMinutes($0) > projectedMinutes($1) }
+            .sorted {
+                let a = actualMinutes($0) ?? projectedMinutes($0)
+                let b = actualMinutes($1) ?? projectedMinutes($1)
+                return a > b
+            }
     }
 
     public init(game: Game, players: [Player], teamName: String) {
         self.game = game
         self.players = players
         self.teamName = teamName
+    }
+
+    private var hasActualPlayingTime: Bool {
+        game.stats?.playerStats.contains { $0.playingTimeSeconds > 0 } ?? false
+    }
+
+    private func actualMinutes(_ player: Player) -> Int? {
+        guard hasActualPlayingTime,
+              let stat = game.stats?.playerStats.first(where: { $0.playerID == player.id }),
+              stat.playingTimeSeconds > 0
+        else { return nil }
+        return stat.playingTimeSeconds / 60
     }
 
     public var body: some View {
@@ -124,7 +140,15 @@ public struct PostGameSummaryView: View {
 
     private var playingTimeSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionHeader("Playing Time")
+            HStack(alignment: .firstTextBaseline) {
+                sectionHeader("Playing Time")
+                Spacer()
+                Text(hasActualPlayingTime ? "Actual" : "Projected")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(hasActualPlayingTime ? Color.crAccent : Color.crTextSecondary.opacity(0.6))
+                    .padding(.trailing, 16)
+                    .padding(.top, 16)
+            }
             let total = max(1, (game.rotationPlan?.slots.count ?? 0) * slotDurationMinutes)
             VStack(spacing: 6) {
                 ForEach(presentPlayers) { player in
@@ -138,7 +162,7 @@ public struct PostGameSummaryView: View {
     }
 
     private func playingTimeRow(player: Player, totalMinutes: Int) -> some View {
-        let mins = projectedMinutes(player)
+        let mins = actualMinutes(player) ?? projectedMinutes(player)
         let minimum = game.fairnessTargets.minutes(for: player.tier)
         let fraction = min(1.0, Double(mins) / Double(totalMinutes))
         let belowMin = mins < minimum
