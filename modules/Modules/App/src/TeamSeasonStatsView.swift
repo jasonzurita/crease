@@ -20,11 +20,9 @@ struct TeamSeasonStatsView: View {
     @State private var sortColumn: SortColumn = .groundBalls
     @State private var sortAscending = false
 
-    // Frames sized for spelled-out labels + sort chevron on all current devices.
-    // ViewThatFits at the HStack level falls back to abbreviations on very narrow screens.
-    private let gpColWidth: CGFloat = 48
-    private let gColWidth: CGFloat = 40
-    private let gbColWidth: CGFloat = 68
+    private let gpColWidth: CGFloat = 36
+    private let gColWidth: CGFloat = 28
+    private let gbColWidth: CGFloat = 36
 
     private var rows: [PlayerRow] {
         let unsorted = store.players.compactMap { player -> PlayerRow? in
@@ -96,21 +94,14 @@ struct TeamSeasonStatsView: View {
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(Color.crTextSecondary)
             Spacer(minLength: 8)
-            ViewThatFits(in: .horizontal) {
-                statColumnLabels(long: true)
-                statColumnLabels(long: false)
+            HStack(spacing: 0) {
+                sortButton(.gamesPlayed, label: "GP", width: gpColWidth)
+                sortButton(.goals, label: "G", width: gColWidth)
+                sortButton(.groundBalls, label: "GB", width: gbColWidth)
             }
         }
         .listRowBackground(Color.crSurface)
         .padding(.vertical, 2)
-    }
-
-    private func statColumnLabels(long: Bool) -> some View {
-        HStack(spacing: 0) {
-            sortButton(.gamesPlayed, label: long ? "Games" : "GP", width: gpColWidth)
-            sortButton(.goals, label: long ? "Goals" : "G", width: gColWidth)
-            sortButton(.groundBalls, label: long ? "Gnd Balls" : "GB", width: gbColWidth)
-        }
     }
 
     private func sortButton(_ col: SortColumn, label: String, width: CGFloat) -> some View {

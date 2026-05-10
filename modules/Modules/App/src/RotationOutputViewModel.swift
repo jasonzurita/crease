@@ -444,15 +444,15 @@ final class RotationOutputViewModel {
         undoStack.removeAll()
         isRegenerating = true
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.2))
-            if let seasonFormat = store.activeSeason?.gameFormatDefaults {
-                var refreshed = game
-                refreshed.format = seasonFormat
-                game = refreshed
-            }
+            let start = Date()
             try? store.generatePlan(for: game)
             if let updated = store.games.first(where: { $0.id == game.id }) {
                 game = updated
+            }
+            let elapsed = Date().timeIntervalSince(start)
+            let remaining = 3.5 - elapsed
+            if remaining > 0 {
+                try? await Task.sleep(for: .seconds(remaining))
             }
             isRegenerating = false
         }
@@ -516,6 +516,11 @@ final class RotationOutputViewModel {
             season.gameFormatDefaults.playersPerSide = season.gameFormatDefaults.derivedPlayersPerSide
             try? store.updateSeason(season)
         }
+        var refreshed = game
+        refreshed.format.positionCounts = counts
+        refreshed.format.hasGoalie = editedHasGoalie
+        refreshed.format.playersPerSide = refreshed.format.derivedPlayersPerSide
+        game = refreshed
         showPositionCountsEditor = false
         doRegenerate()
     }

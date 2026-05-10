@@ -5,8 +5,13 @@ import SwiftUI
 struct LineupCardOptionsSheet: View {
     @Bindable var viewModel: RotationOutputViewModel
     @Environment(\.dismiss) private var dismiss
-    @State private var shareImage: UIImage?
-    @State private var isSharing = false
+
+    private struct SharePayload: Identifiable {
+        let id = UUID()
+        let image: UIImage
+    }
+
+    @State private var sharePayload: SharePayload?
 
     var body: some View {
         NavigationStack {
@@ -31,10 +36,8 @@ struct LineupCardOptionsSheet: View {
                 }
             }
         }
-        .sheet(isPresented: $isSharing) {
-            if let image = shareImage {
-                ActivityView(items: [image])
-            }
+        .sheet(item: $sharePayload) { payload in
+            ActivityView(items: [payload.image])
         }
     }
 
@@ -99,8 +102,7 @@ struct LineupCardOptionsSheet: View {
             let renderer = ImageRenderer(content: card)
             renderer.scale = 3.0
             guard let image = renderer.uiImage else { return }
-            shareImage = image
-            isSharing = true
+            sharePayload = SharePayload(image: image)
         }
     }
 }

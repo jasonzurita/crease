@@ -176,11 +176,15 @@ public struct RotationOutputView: View {
     }
 
     private func rotationGrid(_ plan: RotationPlan) -> some View {
-        HStack(alignment: .top, spacing: 0) {
+        let displayedPositions = Self.orderedPositions.filter { position in
+            position != .goalie || viewModel.game.format.hasGoalie
+        }
+
+        return HStack(alignment: .top, spacing: 0) {
             // Frozen position labels column
             VStack(spacing: 0) {
                 Color.clear.frame(height: headerHeight)
-                ForEach(Self.orderedPositions, id: \.self) { position in
+                ForEach(displayedPositions, id: \.self) { position in
                     let rowCount = maxPlayerCount(position, in: plan)
                     positionGroupLabelDivider(for: position)
                     Text(position.rawValue)
@@ -218,7 +222,7 @@ public struct RotationOutputView: View {
                     }
 
                     // Position rows (multi-player)
-                    ForEach(Self.orderedPositions, id: \.self) { position in
+                    ForEach(displayedPositions, id: \.self) { position in
                         let maxCount = maxPlayerCount(position, in: plan)
                         HStack(spacing: 0) {
                             ForEach(0 ..< plan.slots.count, id: \.self) { _ in
@@ -258,18 +262,8 @@ public struct RotationOutputView: View {
                                             }
                                             .frame(width: colWidth, height: cellHeight)
                                         } else {
-                                            Color.clear
+                                            emptyPositionCell(slotIndex: index, position: position)
                                                 .frame(width: colWidth, height: cellHeight)
-                                                .overlay(alignment: .trailing) {
-                                                    Rectangle()
-                                                        .fill(Color.crTextSecondary.opacity(0.1))
-                                                        .frame(width: 1)
-                                                }
-                                                .overlay(alignment: .bottom) {
-                                                    Rectangle()
-                                                        .fill(Color.crTextSecondary.opacity(0.1))
-                                                        .frame(height: 1)
-                                                }
                                         }
                                     }
                                 }
@@ -292,6 +286,48 @@ public struct RotationOutputView: View {
             }
         }
         .padding(.bottom, 8)
+    }
+
+    private func emptyPositionCell(slotIndex: Int, position: Position) -> some View {
+        let hasBench = viewModel.hasBenchCandidates(slotIndex: slotIndex, position: position)
+        return Group {
+            if hasBench {
+                Button {
+                    viewModel.initiateBenchSwap(slotIndex: slotIndex, position: position)
+                } label: {
+                    emptySlotIndicator(hasBench: true)
+                }
+                .buttonStyle(.plain)
+            } else {
+                emptySlotIndicator(hasBench: false)
+            }
+        }
+        .overlay(alignment: .trailing) {
+            Rectangle()
+                .fill(Color.crTextSecondary.opacity(0.1))
+                .frame(width: 1)
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.crTextSecondary.opacity(0.1))
+                .frame(height: 1)
+        }
+    }
+
+    private func emptySlotIndicator(hasBench: Bool) -> some View {
+        ZStack {
+            Color.clear
+            if hasBench {
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.crTextSecondary.opacity(0.35))
+            } else {
+                Text("—")
+                    .font(.caption2)
+                    .foregroundStyle(Color.crTextSecondary.opacity(0.25))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func positionGroupLabelDivider(for position: Position?) -> some View {
