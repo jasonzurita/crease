@@ -5,7 +5,13 @@ public struct RotationSolver: Sendable {
     private init() {}
 
     public static func solve(game: Game, players: [Player]) -> RotationPlan {
-        guard game.format.quarters > 0, game.format.playersPerSide > 0 else {
+        guard game.format.quarters > 0,
+              game.format.playersPerSide > 0,
+              game.format.quarterLengthMinutes > 0
+        else {
+            return RotationPlan(slots: [], violations: [])
+        }
+        if case let .byTimeInterval(interval) = game.rotationStyle, interval <= 0 {
             return RotationPlan(slots: [], violations: [])
         }
 
@@ -57,10 +63,12 @@ public struct RotationSolver: Sendable {
 
             let locked = lockedBySlot[slotKey(quarter: quarter, subIndex: subIndex)] ?? []
             for lockedAssignment in locked {
-                if availableNow.contains(where: { $0.id == lockedAssignment.playerID }) {
-                    assignedIDs.insert(lockedAssignment.playerID)
-                    assignments.append(lockedAssignment)
-                }
+                guard let player = availableNow.first(where: { $0.id == lockedAssignment.playerID }),
+                      player.positions.contains(lockedAssignment.position),
+                      (slotCounts[lockedAssignment.position] ?? 0) > 0
+                else { continue }
+                assignedIDs.insert(player.id)
+                assignments.append(lockedAssignment)
             }
 
             for position in [Position.goalie, .attack, .midfield, .defense] {

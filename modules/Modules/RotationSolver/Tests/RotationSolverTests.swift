@@ -605,4 +605,408 @@ struct RotationSolverTests {
         let newGoalieID = newPlan.slots[0].assignments.first { $0.position == .goalie }?.playerID
         #expect(newGoalieID != absentGoalieID)
     }
+
+    // MARK: - Guard conditions
+
+    @Test func zeroQuarterLengthProducesEmptyPlan() {
+        let players = allPositionPlayers(count: 7)
+        let game = makeGame(
+            players: players,
+            format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 0, playersPerSide: 7)
+        )
+        let plan = RotationSolver.solve(game: game, players: players)
+        #expect(plan.slots.isEmpty)
+        #expect(plan.violations.isEmpty)
+    }
+
+    @Test func zeroIntervalProducesEmptyPlan() {
+        let players = allPositionPlayers(count: 7)
+        let game = makeGame(
+            players: players,
+            rotationStyle: .byTimeInterval(intervalMinutes: 0)
+        )
+        let plan = RotationSolver.solve(game: game, players: players)
+        #expect(plan.slots.isEmpty)
+        #expect(plan.violations.isEmpty)
+    }
+
+    @Test func negativeIntervalProducesEmptyPlan() {
+        let players = allPositionPlayers(count: 7)
+        let game = makeGame(
+            players: players,
+            rotationStyle: .byTimeInterval(intervalMinutes: -1)
+        )
+        let plan = RotationSolver.solve(game: game, players: players)
+        #expect(plan.slots.isEmpty)
+    }
+
+    // MARK: - Locked cells (additional)
+
+    @Test func lockedCellDroppedWhenPlayerNoLongerEligibleForPosition() {
+        var players = allPositionPlayers(count: 7)
+        var game = makeGame(players: players)
+        var initialPlan = RotationSolver.solve(game: game, players: players)
+
+        guard let goalieIndex = initialPlan.slots[0].assignments
+            .firstIndex(where: { $0.position == .goalie }) else {
+            Issue.record("No goalie assignment found")
+            return
+        }
+        let lockedPlayerID = initialPlan.slots[0].assignments[goalieIndex].playerID
+        initialPlan.slots[0].assignments[goalieIndex].isLocked = true
+        game.rotationPlan = initialPlan
+
+        // Remove goalie eligibility from the locked player
+        if let idx = players.firstIndex(where: { $0.id == lockedPlayerID }) {
+            players[idx] = makePlayer(id: lockedPlayerID, number: players[idx].jerseyNumber, positions: [.attack, .midfield, .defense])
+        }
+
+        let newPlan = RotationSolver.solve(game: game, players: players)
+
+        // Locked player must not appear as goalie
+        let newGoalieAssignment = newPlan.slots[0].assignments.first { $0.position == .goalie }
+        #expect(newGoalieAssignment?.playerID != lockedPlayerID)
+        // A different eligible player fills the goalie slot
+        #expect(newGoalieAssignment != nil)
+    }
+
+    @Test func multipleLockedCellsInSameSlotAllPreserved() {
+        let players = allPositionPlayers(count: 7)
+        var game = makeGame(players: players)
+        var plan = RotationSolver.solve(game: game, players: players)
+
+        let locked1 = plan.slots[0].assignments[0]
+        let locked2 = plan.slots[0].assignments[1]
+        plan.slots[0].assignments[0].isLocked = true
+        plan.slots[0].assignments[1].isLocked = true
+        game.rotationPlan = plan
+
+        let newPlan = RotationSolver.solve(game: game, players: players)
+        let newQ1 = newPlan.slots[0].assignments
+
+        #expect(newQ1.contains { $0.playerID == locked1.playerID && $0.position == locked1.position && $0.isLocked })
+        #expect(newQ1.contains { $0.playerID == locked2.playerID && $0.position == locked2.position && $0.isLocked })
+    }
+
+    // MARK: - Attendance boundary cases
+
+    @Test func lateArrivalOnFirstQuarterIsEffectivelyPresent() {
+        // lateArrivalQuarter = 1 means available from Q1 onward — same as no constraint
+        let lateQ1 = makePlayer(positions: [.attack, .midfield, .defense, .goalie])
+        let fillers = allPositionPlayers(count: 6)
+        let players = [lateQ1] + fillers
+        var att = attendAll(players)
+        att[0] = PlayerAttendance(id: lateQ1.id, isPresent: true, lateArrivalQuarter: 1, earlyDepartureQuarter: nil)
+        let game = makeGame(players: players, attendance: att)
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        let appearedIn = plan.slots.filter { slot in
+            slot.assignments.contains { $0.playerID == lateQ1.id } || slot.bench.contains(lateQ1.id)
+        }.count
+        #expect(appearedIn == plan.slots.count)
+    }
+
+    @Test func earlyDepartureOnLastQuarterIsEffectivelyPresent() {
+        // earlyDepartureQuarter = 4 in a 4-quarter game — available all game
+        let earlyQ4 = makePlayer(positions: [.attack, .midfield, .defense, .goalie])
+        let fillers = allPositionPlayers(count: 6)
+        let players = [earlyQ4] + fillers
+        var att = attendAll(players)
+        att[0] = PlayerAttendance(id: earlyQ4.id, isPresent: true, lateArrivalQuarter: nil, earlyDepartureQuarter: 4)
+        let game = makeGame(players: players, attendance: att, format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 7))
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        let appearedIn = plan.slots.filter { slot in
+            slot.assignments.contains { $0.playerID == earlyQ4.id } || slot.bench.contains(earlyQ4.id)
+        }.count
+        #expect(appearedIn == 4)
+    }
+
+    @Test func lateArrivalAndEarlyDepartureSameQuarterRestrictsToOneQuarter() {
+        // Available only in Q2 (late Q2, early Q2)
+        let restricted = makePlayer(positions: [.attack, .midfield, .defense, .goalie])
+        let fillers = allPositionPlayers(count: 7)
+        let players = [restricted] + fillers
+        var att = attendAll(players)
+        att[0] = PlayerAttendance(id: restricted.id, isPresent: true, lateArrivalQuarter: 2, earlyDepartureQuarter: 2)
+        let game = makeGame(players: players, attendance: att)
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        for slot in plan.slots where slot.quarter != 2 {
+            let allIDs = Set(slot.assignments.map { $0.playerID } + slot.bench)
+            #expect(!allIDs.contains(restricted.id))
+        }
+        let appearsInQ2 = plan.slots.filter { $0.quarter == 2 }.contains { slot in
+            slot.assignments.contains { $0.playerID == restricted.id } || slot.bench.contains(restricted.id)
+        }
+        #expect(appearsInQ2)
+    }
+
+    // MARK: - Boosted players (additional)
+
+    @Test func multipleBoostedPlayersAllGetPriority() {
+        // 4 boosted + 10 unboosted, 7v7, 4 quarters — every boosted player plays at least as much as any unboosted
+        let players = allPositionPlayers(count: 14)
+        let boostedIDs = players.prefix(4).map { $0.id }
+        let game = makeGame(players: players, mode: .fair, boostedPlayerIDs: Array(boostedIDs))
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        var playCount: [UUID: Int] = [:]
+        for slot in plan.slots {
+            for assignment in slot.assignments {
+                playCount[assignment.playerID, default: 0] += 1
+            }
+        }
+        let boostedCounts = boostedIDs.map { playCount[$0] ?? 0 }
+        let unboostedCounts = players.dropFirst(4).map { playCount[$0.id] ?? 0 }
+        let minBoosted = boostedCounts.min() ?? 0
+        let maxUnboosted = unboostedCounts.max() ?? 0
+        #expect(minBoosted >= maxUnboosted)
+    }
+
+    @Test func absentBoostedPlayerIsNotAssigned() {
+        let players = allPositionPlayers(count: 14)
+        let absentBoosted = players[0]
+        var att = attendAll(players)
+        att[0] = PlayerAttendance(id: absentBoosted.id, isPresent: false, lateArrivalQuarter: nil, earlyDepartureQuarter: nil)
+        let game = makeGame(players: players, attendance: att, mode: .fair, boostedPlayerIDs: [absentBoosted.id])
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        for slot in plan.slots {
+            let allIDs = slot.assignments.map { $0.playerID } + slot.bench
+            #expect(!allIDs.contains(absentBoosted.id))
+        }
+    }
+
+    // MARK: - Time interval edge cases
+
+    @Test func intervalLargerThanQuarterLengthProducesOneSlotPerQuarter() {
+        // 15-minute interval with a 10-minute quarter → floor(10/15) = 0, max(1, 0) = 1 slot per quarter
+        let players = allPositionPlayers(count: 7)
+        let game = makeGame(
+            players: players,
+            format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 7),
+            rotationStyle: .byTimeInterval(intervalMinutes: 15)
+        )
+        let plan = RotationSolver.solve(game: game, players: players)
+        #expect(plan.slots.count == 4)
+        #expect(plan.slots.allSatisfy { $0.subIndex == 0 })
+    }
+
+    @Test func competitiveModeKeySlotWithTimeInterval() {
+        // Competitive + byTimeInterval: sub-index 0 of each quarter is the key slot
+        let elites = (0 ..< 4).map { i in makePlayer(number: i, positions: [.attack, .midfield, .defense, .goalie], tier: .elite) }
+        let developing = (0 ..< 10).map { i in makePlayer(number: i + 10, positions: [.attack, .midfield, .defense, .goalie], tier: .developing) }
+        let players = elites + developing
+        let game = makeGame(
+            players: players,
+            format: GameFormatDefaults(quarters: 2, quarterLengthMinutes: 10, playersPerSide: 7),
+            rotationStyle: .byTimeInterval(intervalMinutes: 5),
+            mode: .competitive
+        )
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        let eliteIDs = Set(elites.map { $0.id })
+        let keySlots = plan.slots.filter { $0.subIndex == 0 }
+        for slot in keySlots {
+            let assignedElites = slot.assignments.filter { eliteIDs.contains($0.playerID) }.count
+            #expect(assignedElites == elites.count)
+        }
+    }
+
+    // MARK: - Position count override
+
+    @Test func explicitPositionCountOverrideIsRespected() {
+        // 3 attack + 2 midfield + 2 defense + 1 goalie = 8 field slots
+        let players = allPositionPlayers(count: 8)
+        let counts = PositionCounts(attack: 3, midfield: 2, defense: 2)
+        let game = makeGame(
+            players: players,
+            format: GameFormatDefaults(quarters: 2, quarterLengthMinutes: 10, playersPerSide: 8, positionCounts: counts)
+        )
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        for slot in plan.slots {
+            #expect(slot.assignments.filter { $0.position == .attack }.count == 3)
+            #expect(slot.assignments.filter { $0.position == .midfield }.count == 2)
+            #expect(slot.assignments.filter { $0.position == .defense }.count == 2)
+            #expect(slot.assignments.filter { $0.position == .goalie }.count == 1)
+        }
+    }
+
+    // MARK: - Invariant checks
+
+    @Test func noPlayerAssignedMoreThanOnceInSameSlot() {
+        // Small roster (5) for a 7-slot game forces shortfalls but no duplicates
+        let players = allPositionPlayers(count: 5)
+        let game = makeGame(
+            players: players,
+            format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 7)
+        )
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        for slot in plan.slots {
+            let assignedIDs = slot.assignments.map { $0.playerID }
+            #expect(Set(assignedIDs).count == assignedIDs.count)
+        }
+    }
+
+    @Test func benchAndAssignmentsAreAlwaysDisjoint() {
+        let players = allPositionPlayers(count: 14)
+        let game = makeGame(players: players)
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        for slot in plan.slots {
+            let assignedSet = Set(slot.assignments.map { $0.playerID })
+            let benchSet = Set(slot.bench)
+            #expect(assignedSet.isDisjoint(with: benchSet))
+        }
+    }
+
+    @Test func playerWithNoPositionEligibilityLandsOnBench() {
+        // A player with empty positions set is present but can never be assigned a position
+        let noPos = makePlayer(positions: [])
+        let fillers = allPositionPlayers(count: 7)
+        let players = [noPos] + fillers
+        let game = makeGame(players: players)
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        for slot in plan.slots {
+            #expect(!slot.assignments.contains { $0.playerID == noPos.id })
+            #expect(slot.bench.contains(noPos.id))
+        }
+    }
+
+    // MARK: - Integration
+
+    @Test func fullGameMixedPositionRoster() throws {
+        // 12 players: 1 goalie-only, 3 attack-only, 3 defense-only, 5 all-position
+        let goalie = makePlayer(number: 0, positions: [.goalie])
+        let attackOnly = (1 ... 3).map { i in makePlayer(number: i, positions: [.attack]) }
+        let defenseOnly = (4 ... 6).map { i in makePlayer(number: i, positions: [.defense]) }
+        let allPos = (7 ... 11).map { i in makePlayer(number: i, positions: [.attack, .midfield, .defense, .goalie]) }
+        let players = [goalie] + attackOnly + defenseOnly + allPos
+        let game = makeGame(
+            players: players,
+            format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 7)
+        )
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        for slot in plan.slots {
+            // No duplicate player IDs in a single slot's assignments
+            let assignedIDs = slot.assignments.map { $0.playerID }
+            #expect(Set(assignedIDs).count == assignedIDs.count)
+            // Every assigned player is eligible for their position
+            for assignment in slot.assignments {
+                let player = try #require(players.first { $0.id == assignment.playerID })
+                #expect(player.positions.contains(assignment.position))
+            }
+            // Bench and assignments don't overlap
+            #expect(Set(assignedIDs).isDisjoint(with: Set(slot.bench)))
+        }
+    }
+
+    @Test func regenerationPreservesLockedCellsWhileRespectingNewAbsence() {
+        // 8 players: lock goalie in Q1, then mark a different player absent and regenerate
+        let players = allPositionPlayers(count: 8)
+        var game = makeGame(players: players)
+        var plan = RotationSolver.solve(game: game, players: players)
+
+        guard let goalieIndex = plan.slots[0].assignments.firstIndex(where: { $0.position == .goalie }) else {
+            Issue.record("No goalie found in initial plan")
+            return
+        }
+        let lockedGoalieID = plan.slots[0].assignments[goalieIndex].playerID
+        plan.slots[0].assignments[goalieIndex].isLocked = true
+        game.rotationPlan = plan
+
+        // Mark a different player absent
+        guard let otherPlayer = players.first(where: { $0.id != lockedGoalieID }) else {
+            Issue.record("No other player found")
+            return
+        }
+        var att = game.attendance
+        if let idx = att.firstIndex(where: { $0.id == otherPlayer.id }) {
+            att[idx] = PlayerAttendance(id: otherPlayer.id, isPresent: false, lateArrivalQuarter: nil, earlyDepartureQuarter: nil)
+        }
+        game.attendance = att
+
+        let newPlan = RotationSolver.solve(game: game, players: players)
+
+        // Locked goalie still in Q1
+        let newGoalie = newPlan.slots[0].assignments.first { $0.position == .goalie }
+        #expect(newGoalie?.playerID == lockedGoalieID)
+        #expect(newGoalie?.isLocked == true)
+        // Absent player appears nowhere
+        for slot in newPlan.slots {
+            let allIDs = slot.assignments.map { $0.playerID } + slot.bench
+            #expect(!allIDs.contains(otherPlayer.id))
+        }
+    }
+
+    @Test func largeRosterFairModeProducesTightDistribution() {
+        // 24 players, 12v12 no-goalie, 4 quarters — max - min play count must be ≤ 1
+        let players = (0 ..< 24).map { i in makePlayer(number: i, positions: [.attack, .midfield, .defense]) }
+        let game = makeGame(
+            players: players,
+            format: GameFormatDefaults(quarters: 4, quarterLengthMinutes: 10, playersPerSide: 12, hasGoalie: false),
+            mode: .fair
+        )
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        var playCount: [UUID: Int] = [:]
+        for slot in plan.slots {
+            for assignment in slot.assignments {
+                playCount[assignment.playerID, default: 0] += 1
+            }
+        }
+        let counts = Array(playCount.values)
+        let minCount = counts.min() ?? 0
+        let maxCount = counts.max() ?? 0
+        #expect(maxCount - minCount <= 1)
+    }
+
+    @Test func mixedAttendanceAllConstraintsRespected() {
+        // 12 players: 2 absent, 2 late Q3, 1 early Q2, 7 fully present; 7v7, 4 quarters
+        let fullyPresent = (0 ..< 7).map { i in makePlayer(number: i, positions: [.attack, .midfield, .defense, .goalie]) }
+        let absentPlayers = (7 ..< 9).map { i in makePlayer(number: i, positions: [.attack, .midfield, .defense, .goalie]) }
+        let latePlayers = (9 ..< 11).map { i in makePlayer(number: i, positions: [.attack, .midfield, .defense, .goalie]) }
+        let earlyPlayer = makePlayer(number: 11, positions: [.attack, .midfield, .defense, .goalie])
+        let players = fullyPresent + absentPlayers + latePlayers + [earlyPlayer]
+
+        var att: [PlayerAttendance] = []
+        att += fullyPresent.map { PlayerAttendance(id: $0.id, isPresent: true, lateArrivalQuarter: nil, earlyDepartureQuarter: nil) }
+        att += absentPlayers.map { PlayerAttendance(id: $0.id, isPresent: false, lateArrivalQuarter: nil, earlyDepartureQuarter: nil) }
+        att += latePlayers.map { PlayerAttendance(id: $0.id, isPresent: true, lateArrivalQuarter: 3, earlyDepartureQuarter: nil) }
+        att.append(PlayerAttendance(id: earlyPlayer.id, isPresent: true, lateArrivalQuarter: nil, earlyDepartureQuarter: 2))
+
+        let game = makeGame(players: players, attendance: att, mode: .fair)
+        let plan = RotationSolver.solve(game: game, players: players)
+
+        for slot in plan.slots {
+            let allIDs = Set(slot.assignments.map { $0.playerID } + slot.bench)
+            // Absent players never appear
+            for absent in absentPlayers {
+                #expect(!allIDs.contains(absent.id))
+            }
+            // Late players only appear in Q3+
+            if slot.quarter < 3 {
+                for late in latePlayers {
+                    #expect(!allIDs.contains(late.id))
+                }
+            }
+            // Early player only in Q1 and Q2
+            if slot.quarter > 2 {
+                #expect(!allIDs.contains(earlyPlayer.id))
+            }
+        }
+
+        // Late players appear in at least one slot from Q3 onward
+        let lateSlotsIDs = plan.slots.filter { $0.quarter >= 3 }.flatMap {
+            $0.assignments.map { $0.playerID } + $0.bench
+        }
+        for late in latePlayers {
+            #expect(lateSlotsIDs.contains(late.id))
+        }
+    }
 }
